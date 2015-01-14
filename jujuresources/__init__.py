@@ -12,16 +12,12 @@ def _load_resources(resources_yaml):
     """
     with open(resources_yaml) as fp:
         resources = yaml.load(fp).get('resources', {})
-    for name, (url, hash) in resources.iteritems():
-        filename = os.path.basename(urlparse(url).path)
-        hash_type, hash = hash.split(':')
-        resources[name] = {
+    for name, resource in resources.iteritems():
+        filename = os.path.basename(urlparse(resource['url']).path)
+        resource.update({
             'name': name,
-            'url': url,
             'filename': filename,
-            'hash_type': hash_type,
-            'hash': hash,
-        }
+        })
     return resources
 
 
@@ -62,9 +58,12 @@ def fetch_resources(resources_yaml='resources.yaml', output_dir=None, base_url=N
     Attempt to fetch all resources for a charm.
 
     Resources are described in a `resources.yaml` file, which should contain
-    a `resources` item containing a mapping of resource names to URL / hash
-    pairs.  Hashes should be of the form `<type>:<hash>` where `<type>` is
-    one of the supported hash types, such as `md5`, `sha512`, etc.
+    a `resources` item containing a mapping of resource names to definitions.
+    Definitions should be mappings with the following keys:
+
+      * *url* URL for the resource
+      * *hash* Cryptographic hash for the resource
+      * *hash_type* Algorithm used to generate the hash; e.g., md5, sha512, etc.
 
     Note that errors fetching resources, incomplete or corrupted downloads,
     and other issues are silently ignored.  You should *always* call
