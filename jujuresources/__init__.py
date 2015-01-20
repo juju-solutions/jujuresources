@@ -17,12 +17,14 @@ def _load_resources(resources_yaml):
         with open(resources_yaml) as fp:
             resources_cache[resources_yaml] = resdefs = yaml.load(fp)
         output_dir = resdefs.get('options', {}).get('output_dir', 'resources')
-        for name, resource in resdefs['resources'].iteritems():
+        resdefs.setdefault('optional_resources', {})
+        resdefs['all_resources'] = dict(resdefs['resources'], **resdefs['optional_resources'])
+        for name, resource in resdefs['all_resources'].iteritems():
             resource.setdefault(
                 'filename', os.path.basename(urlparse(resource['url']).path))
             resource.setdefault(
                 'destination', os.path.join(output_dir, resource['filename']))
-    return resources_cache[resources_yaml]['resources']
+    return resources_cache[resources_yaml]
 
 
 def verify_resources(resources_to_check=None, resources_yaml='resources.yaml'):
@@ -31,17 +33,17 @@ def verify_resources(resources_to_check=None, resources_yaml='resources.yaml'):
     including validating their cryptographic hash.
 
     :param list resources_to_check: A list of one or more resource names to
-        check.  If ommitted, all resources are verified.
+        check.  If ommitted, all non-optional resources are verified.
     :param str resources_yaml: Location of the yaml file containing the
         resource descriptions  Defaults to `resources.yaml` in the current
         directory.
     :return: True if all of the resources are available and valid, otherwise False.
     """
-    resources = _load_resources(resources_yaml)
+    resdefs = _load_resources(resources_yaml)
     if resources_to_check is None:
-        resources_to_check = resources.keys()
+        resources_to_check = resdefs['resources'].keys()
     for name in resources_to_check:
-        resource = resources[name]
+        resource = resdefs['all_resources'][name]
         if not os.path.exists(resource['destination']):
             return False
         with open(resource['destination']) as fp:
@@ -52,7 +54,7 @@ def verify_resources(resources_to_check=None, resources_yaml='resources.yaml'):
     return True
 
 
-def fetch_resources(resources_yaml='resources.yaml', base_url=None):
+def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml', base_url=None):
     """
     Attempt to fetch all resources for a charm.
 
@@ -74,6 +76,8 @@ def fetch_resources(resources_yaml='resources.yaml', base_url=None):
     :func:`verify_resources` after this to confirm that everything was
     retrieved successfully.
 
+    :param list resources_to_fetch: A list of one or more resource names to
+        fetch.  If ommitted, all non-optional resources are fetched.
     :param str resources_yaml: Location of the yaml file containing the
         resource descriptions  Defaults to `resources.yaml` in the current
         directory.
@@ -82,8 +86,11 @@ def fetch_resources(resources_yaml='resources.yaml', base_url=None):
         with the rest of the URL being ignored in favor of the given
         `base_url`.
     """
-    resources = _load_resources(resources_yaml)
-    for name, resource in resources.iteritems():
+    resdefs = _load_resources(resources_yaml)
+    if resources_to_fetch is None:
+        resources_to_fetch = resdefs['resources'].keys()
+    for name in resources_to_fetch:
+        resource = resdefs['all_resources'][name]
         if base_url:
             url = urljoin(base_url, resource['filename'])
         else:
@@ -102,5 +109,5 @@ def resource_path(resource_name, resources_yaml='resources.yaml'):
     """
     Get the destination path for a named resource.
     """
-    resources = _load_resources(resources_yaml)
-    return resources[resource_name]['destination']
+    resdefs = _load_resources(resources_yaml)
+    return resdefs['all_resources'][resource_name]['destination']
