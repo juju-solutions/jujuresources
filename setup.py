@@ -25,6 +25,7 @@ SETUP = {
         'jujuresources.subcommands': [
             'fetch = jujuresources.cli:fetch',
             'upload = jujuresources.cli:upload',
+            'serve = jujuresources.cli:serve',
         ],
     },
     'license': "MIT License",

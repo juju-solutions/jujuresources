@@ -1,8 +1,8 @@
 import argparse
 from pkg_resources import iter_entry_points
 
-from jujuresources import fetch_resources
-from jujuresources import verify_resources
+from jujuresources import _fetch_resources
+from jujuresources import _verify_resources
 from jujuresources import _load_resources
 
 
@@ -66,10 +66,12 @@ def resources():
           'filename portion will be used from the resource descriptions)')
 def fetch(opts):
     """
-    Attempt to fetch all resources for a charm
+    Create a local mirror of all resources (mandatory and optional) for a charm
     """
-    fetch_resources(opts.resources, opts.output_dir, opts.base_url)
-    if verify_resources(None, opts.resources, opts.output_dir):
+    resdefs = _load_resources(opts.resources, opts.output_dir)
+    all_resources = resdefs['all_resources'].keys()
+    _fetch_resources(resdefs, all_resources, opts.base_url)
+    if _verify_resources(resdefs, all_resources):
         print "All resources successfully downloaded"
     else:
         print "One or more resources failed to download correctly"
@@ -80,7 +82,7 @@ def fetch(opts):
 @arg('-r', '--resources', default='resources.yaml',
      help='YAML file containing the resource descriptions (default: ./resources.yaml)')
 @arg('-d', '--output-dir',
-     help='Directory to place the fetched resources (default ./resources/)')
+     help='Directory containing the fetched resources (default ./resources/)')
 def upload(opts):
     """
     Upload resources from local copies to a deployed charm
@@ -89,3 +91,14 @@ def upload(opts):
     resources = _load_resources(opts.resources)
     for name, resource in resources.iteritems():
         pass
+
+
+@arg('-r', '--resources', default='resources.yaml',
+     help='YAML file containing the resource descriptions (default: ./resources.yaml)')
+@arg('-d', '--output-dir',
+     help='Directory containing the fetched resources (default ./resources/)')
+def serve(opts):
+    """
+    Run a lightweight HTTP server hosting previously mirrored resources
+    """
+    raise NotImplementedError('Serving resources is not yet implemented')

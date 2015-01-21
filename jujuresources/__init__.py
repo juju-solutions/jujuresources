@@ -9,14 +9,14 @@ import yaml
 resources_cache = {}
 
 
-def _load_resources(resources_yaml):
+def _load_resources(resources_yaml, output_dir=None):
     """
     Parse `resources.yaml` file and remap the values for easier use.
     """
     if resources_yaml not in resources_cache:
         with open(resources_yaml) as fp:
             resources_cache[resources_yaml] = resdefs = yaml.load(fp)
-        output_dir = resdefs.get('options', {}).get('output_dir', 'resources')
+        output_dir = output_dir or resdefs.get('options', {}).get('output_dir', 'resources')
         resdefs.setdefault('optional_resources', {})
         resdefs['all_resources'] = dict(resdefs['resources'], **resdefs['optional_resources'])
         for name, resource in resdefs['all_resources'].iteritems():
@@ -27,19 +27,7 @@ def _load_resources(resources_yaml):
     return resources_cache[resources_yaml]
 
 
-def verify_resources(resources_to_check=None, resources_yaml='resources.yaml'):
-    """
-    Verify if some or all resources previously fetched with :func:`fetch_resources`,
-    including validating their cryptographic hash.
-
-    :param list resources_to_check: A list of one or more resource names to
-        check.  If ommitted, all non-optional resources are verified.
-    :param str resources_yaml: Location of the yaml file containing the
-        resource descriptions  Defaults to `resources.yaml` in the current
-        directory.
-    :return: True if all of the resources are available and valid, otherwise False.
-    """
-    resdefs = _load_resources(resources_yaml)
+def _verify_resources(resdefs, resources_to_check):
     if resources_to_check is None:
         resources_to_check = resdefs['resources'].keys()
     for name in resources_to_check:
@@ -52,6 +40,44 @@ def verify_resources(resources_to_check=None, resources_yaml='resources.yaml'):
             if resource['hash'] != hash.hexdigest():
                 return False
     return True
+
+
+def _fetch_resources(resdefs, resources_to_fetch, base_url):
+    if resources_to_fetch is None:
+        resources_to_fetch = resdefs['resources'].keys()
+    for name in resources_to_fetch:
+        resource = resdefs['all_resources'][name]
+        if base_url:
+            url = urljoin(base_url, resource['filename'])
+        else:
+            url = resource['url']
+        if url.startswith('./'):
+            url = url[2:]  # urlretrieve complains about this for some reason
+        if not os.path.exists(os.path.dirname(resource['dest'])):
+            os.makedirs(os.path.dirname(resource['destination']))
+        try:
+            urlretrieve(url, resource['destination'])
+        except IOError:
+            continue
+
+
+def verify_resources(resources_to_check=None, resources_yaml='resources.yaml'):
+    """
+    Verify if some or all resources previously fetched with :func:`fetch_resources`,
+    including validating their cryptographic hash.
+
+    :param list resources_to_check: A list of one or more resource names to
+        check.  If ommitted, all non-optional resources are verified.
+    :param str resources_yaml: Location of the yaml file containing the
+        resource descriptions  Defaults to `resources.yaml` in the current
+        directory.
+    :param str output_dir: Override `output_dir` option from `resources_yaml`
+        (this is intended for mirroring via the CLI and it is not recommended
+        to be used otherwise)
+    :return: True if all of the resources are available and valid, otherwise False.
+    """
+    resdefs = _load_resources(resources_yaml, None)
+    return _verify_resources(resdefs)
 
 
 def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml', base_url=None):
@@ -85,29 +111,17 @@ def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml', ba
         If given, only the filename from the resource definitions are used,
         with the rest of the URL being ignored in favor of the given
         `base_url`.
+    :param str output_dir: Override `output_dir` option from `resources_yaml`
+        (this is intended for mirroring via the CLI and it is not recommended
+        to be used otherwise)
     """
-    resdefs = _load_resources(resources_yaml)
-    if resources_to_fetch is None:
-        resources_to_fetch = resdefs['resources'].keys()
-    for name in resources_to_fetch:
-        resource = resdefs['all_resources'][name]
-        if base_url:
-            url = urljoin(base_url, resource['filename'])
-        else:
-            url = resource['url']
-        if url.startswith('./'):
-            url = url[2:]  # urlretrieve complains about this for some reason
-        if not os.path.exists(os.path.dirname(resource['dest'])):
-            os.makedirs(os.path.dirname(resource['destination']))
-        try:
-            urlretrieve(url, resource['destination'])
-        except IOError:
-            continue
+    resdefs = _load_resources(resources_yaml, None)
+    return _fetch_resources(resdefs, resources_to_fetch, base_url)
 
 
 def resource_path(resource_name, resources_yaml='resources.yaml'):
     """
     Get the destination path for a named resource.
     """
-    resdefs = _load_resources(resources_yaml)
+    resdefs = _load_resources(resources_yaml, None)
     return resdefs['all_resources'][resource_name]['destination']
