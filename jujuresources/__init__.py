@@ -20,6 +20,9 @@ def _load_resources(resources_yaml, output_dir=None):
         resdefs.setdefault('optional_resources', {})
         resdefs['all_resources'] = dict(resdefs['resources'], **resdefs['optional_resources'])
         for name, resource in resdefs['all_resources'].iteritems():
+            resource.setdefault('url', '')
+            resource.setdefault('hash', '')
+            resource.setdefault('hash_type', '')
             resource.setdefault(
                 'filename', os.path.basename(urlparse(resource['url']).path))
             resource.setdefault(
@@ -32,7 +35,7 @@ def _verify_resources(resdefs, resources_to_check):
         resources_to_check = resdefs['resources'].keys()
     for name in resources_to_check:
         resource = resdefs['all_resources'][name]
-        if not os.path.exists(resource['destination']):
+        if not os.path.isfile(resource['destination']):
             return False
         with open(resource['destination']) as fp:
             hash = hashlib.new(resource['hash_type'])
