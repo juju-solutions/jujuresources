@@ -53,7 +53,7 @@ def _fetch_resources(resdefs, resources_to_fetch, base_url):
             url = resource['url']
         if url.startswith('./'):
             url = url[2:]  # urlretrieve complains about this for some reason
-        if not os.path.exists(os.path.dirname(resource['dest'])):
+        if not os.path.exists(os.path.dirname(resource['destination'])):
             os.makedirs(os.path.dirname(resource['destination']))
         try:
             urlretrieve(url, resource['destination'])
