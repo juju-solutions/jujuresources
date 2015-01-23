@@ -77,7 +77,7 @@ def verify_resources(resources_to_check=None, resources_yaml='resources.yaml'):
     :return: True if all of the resources are available and valid, otherwise False.
     """
     resdefs = _load_resources(resources_yaml, None)
-    return _verify_resources(resdefs)
+    return _verify_resources(resdefs, resources_to_check)
 
 
 def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml', base_url=None):
