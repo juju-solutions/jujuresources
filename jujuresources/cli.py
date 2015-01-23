@@ -41,7 +41,8 @@ def resources():
         description='Manage and mirror charm resources',
         epilog='\n'.join(
             ['Available subcommands:'] +
-            ['    %s' % c for c in ep_map.keys()]),
+            ['  {:14} {}'.format(c, f.__doc__.strip()) for c, f in ep_map.items()]),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
     parser.add_argument('--description', action='store_true')
@@ -104,6 +105,6 @@ def upload(opts):
      help='Directory containing the fetched resources (default ./resources/)')
 def serve(opts):
     """
-    Run a lightweight HTTP server hosting previously mirrored resources
+    Run a light-weight HTTP server hosting previously mirrored resources
     """
     raise NotImplementedError('Serving resources is not yet implemented')

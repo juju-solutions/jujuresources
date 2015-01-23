@@ -16,7 +16,6 @@ SETUP = {
     'url': "https://code.launchpad.net/~johnsca/jujuresources",
     'packages': [
         "jujuresources",
-        "jujuresources.cli",
     ],
     'entry_points': {
         'console_scripts': [
