@@ -38,11 +38,16 @@ def resources():
     ep_map = {ep.name: ep.load() for ep in eps}
 
     parser = argparse.ArgumentParser(
-        description='Manage resources for a charm',
+        description='Manage and mirror charm resources',
         epilog='\n'.join(
             ['Available subcommands:'] +
             ['    %s' % c for c in ep_map.keys()]),
     )
+
+    parser.add_argument('--description', action='store_true')
+    if parser.parse_args().description:
+        print parser.description
+        return
     subparsers = parser.add_subparsers()
     for name, subcommand in ep_map.iteritems():
         subparser = subparsers.add_parser(name, help=subcommand.__doc__)
