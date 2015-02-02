@@ -1,7 +1,8 @@
 import os
 import hashlib
+import subprocess
 from urlparse import urlparse, urljoin
-from urllib import urlretrieve
+from urllib import urlretrieve, urlopen
 
 import yaml
 
@@ -9,12 +10,27 @@ import yaml
 resources_cache = {}
 
 
+def config_get(option_name):
+    """
+    Helper to access a Juju config option when charmhelpers is not available.
+    """
+    try:
+        raw = subprocess.check_output(['config-get', option_name, '--format=yaml'])
+        return yaml.loads(raw.decode('UTF-8'))
+    except ValueError:
+        return None
+
+
 def _load_resources(resources_yaml, output_dir=None):
     """
-    Parse `resources.yaml` file and remap the values for easier use.
+    Parse ``resources.yaml`` file and remap the values for easier use.
+
+    :param str resources_yaml: Local file or a remote URL where
+        the ``resources.yaml`` file can be found
+    :param str output_dir: Override the ``output_dir`` option from the file
     """
     if resources_yaml not in resources_cache:
-        with open(resources_yaml) as fp:
+        with urlopen(resources_yaml) as fp:
             resources_cache[resources_yaml] = resdefs = yaml.load(fp)
         output_dir = output_dir or resdefs.get('options', {}).get('output_dir', 'resources')
         resdefs.setdefault('optional_resources', {})
@@ -109,7 +125,7 @@ def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml', ba
         fetch.  If ommitted, all non-optional resources are fetched.
     :param str resources_yaml: Location of the yaml file containing the
         resource descriptions  Defaults to `resources.yaml` in the current
-        directory.
+        directory.  Can be a local file name or a remote URL.
     :param str base_url: Override the location to fetch all resources from.
         If given, only the filename from the resource definitions are used,
         with the rest of the URL being ignored in favor of the given

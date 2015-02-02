@@ -1,3 +1,4 @@
+import sys
 import argparse
 from pkg_resources import iter_entry_points
 
@@ -60,11 +61,11 @@ def resources():
             for args, kwargs in argset:
                 group.add_argument(*args, **kwargs)
     opts = parser.parse_args()
-    opts.subcommand(opts)
+    sys.exit(opts.subcommand(opts) or 0)
 
 
 @arg('-r', '--resources', default='resources.yaml',
-     help='YAML file containing the resource descriptions (default: ./resources.yaml)')
+     help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
 @arg('-d', '--output-dir',
      help='Directory to place the fetched resources (default ./resources/)')
 @arg('-u', '--base-url',
@@ -79,14 +80,16 @@ def fetch(opts):
     _fetch_resources(resdefs, all_resources, opts.base_url)
     if _verify_resources(resdefs, all_resources):
         print "All resources successfully downloaded"
+        return 0
     else:
         print "One or more resources failed to download correctly"
+        return 1
 
 
 @argset('dest', '-u', '--unit', help='Unit to upload resources to')
 @argset('dest', '-s', '--service', help='Service to upload resources to (all units of)')
 @arg('-r', '--resources', default='resources.yaml',
-     help='YAML file containing the resource descriptions (default: ./resources.yaml)')
+     help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
 @arg('-d', '--output-dir',
      help='Directory containing the fetched resources (default ./resources/)')
 def upload(opts):
@@ -100,7 +103,7 @@ def upload(opts):
 
 
 @arg('-r', '--resources', default='resources.yaml',
-     help='YAML file containing the resource descriptions (default: ./resources.yaml)')
+     help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
 @arg('-d', '--output-dir',
      help='Directory containing the fetched resources (default ./resources/)')
 def serve(opts):
