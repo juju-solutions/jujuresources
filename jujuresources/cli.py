@@ -1,6 +1,10 @@
+import os
 import sys
+import socket
 import argparse
 from pkg_resources import iter_entry_points
+from SimpleHTTPServer import SimpleHTTPRequestHandler
+import SocketServer
 
 from jujuresources import _fetch_resources
 from jujuresources import _verify_resources
@@ -38,35 +42,38 @@ def resources():
     eps = iter_entry_points('jujuresources.subcommands')
     ep_map = {ep.name: ep.load() for ep in eps}
 
-    parser = argparse.ArgumentParser(
-        description='Manage and mirror charm resources',
-        epilog='\n'.join(
-            ['Available subcommands:'] +
-            ['  {:14} {}'.format(c, f.__doc__.strip()) for c, f in ep_map.items()]),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-
-    parser.add_argument('--description', action='store_true')
-    if parser.parse_args().description:
-        print parser.description
+    if '--description' in sys.argv:
+        print 'Manage and mirror charm resources'
         return
-    subparsers = parser.add_subparsers()
+
+    parser = argparse.ArgumentParser()
+    subparsers = {}
+    subparser_factory = parser.add_subparsers()
+    subparsers['help'] = subparser_factory.add_parser('help', help='Display help for a subcommand')
+    subparsers['help'].add_argument('command', nargs='?')
+    subparsers['help'].set_defaults(subcommand='help')
     for name, subcommand in ep_map.iteritems():
-        subparser = subparsers.add_parser(name, help=subcommand.__doc__)
-        subparser.set_defaults(subcommand=subcommand)
+        subparsers[name] = subparser_factory.add_parser(name, help=subcommand.__doc__)
+        subparsers[name].set_defaults(subcommand=subcommand)
         for args, kwargs in getattr(subcommand, '_subcommand_args', []):
-            subparser.add_argument(*args, **kwargs)
+            subparsers[name].add_argument(*args, **kwargs)
         for argset in getattr(subcommand, '_subcommand_argsets', {}).values():
-            group = subparser.add_mutually_exclusive_group(required=True)
+            group = subparsers[name].add_mutually_exclusive_group(required=True)
             for args, kwargs in argset:
                 group.add_argument(*args, **kwargs)
     opts = parser.parse_args()
-    sys.exit(opts.subcommand(opts) or 0)
+    if opts.subcommand == 'help':
+        if opts.command:
+            subparsers[opts.command].print_help()
+        else:
+            parser.print_help()
+    else:
+        sys.exit(opts.subcommand(opts) or 0)
 
 
 @arg('-r', '--resources', default='resources.yaml',
      help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
-@arg('-d', '--output-dir',
+@arg('-d', '--output-dir', default='resources',
      help='Directory to place the fetched resources (default ./resources/)')
 @arg('-u', '--base-url',
      help='Base URL from which to fetch the resources (if given, only the '
@@ -77,7 +84,22 @@ def fetch(opts):
     """
     resdefs = _load_resources(opts.resources, opts.output_dir)
     all_resources = resdefs['all_resources'].keys()
-    _fetch_resources(resdefs, all_resources, opts.base_url)
+
+    def reporthook(name, block, block_size, total_size):
+        if name != reporthook.last_name:
+            if reporthook.last_name:
+                print
+            sys.stdout.write('Fetching {}'.format(name))
+            reporthook.last_name = name
+        tenth = int(block * block_size * 10 / total_size)
+        if tenth != reporthook.last_tenth:
+            sys.stdout.write('.' * (tenth - reporthook.last_tenth))
+            reporthook.last_tenth = tenth
+        sys.stdout.flush()
+    reporthook.last_name = None
+    reporthook.last_tenth = 0
+    _fetch_resources(resdefs, all_resources, opts.base_url, reporthook=reporthook)
+    print
     if _verify_resources(resdefs, all_resources):
         print "All resources successfully downloaded"
         return 0
@@ -90,7 +112,7 @@ def fetch(opts):
 @argset('dest', '-s', '--service', help='Service to upload resources to (all units of)')
 @arg('-r', '--resources', default='resources.yaml',
      help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
-@arg('-d', '--output-dir',
+@arg('-d', '--output-dir', default='resources',
      help='Directory containing the fetched resources (default ./resources/)')
 def upload(opts):
     """
@@ -102,12 +124,19 @@ def upload(opts):
         pass
 
 
-@arg('-r', '--resources', default='resources.yaml',
-     help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
-@arg('-d', '--output-dir',
+@arg('-d', '--output-dir', default='resources',
      help='Directory containing the fetched resources (default ./resources/)')
+@arg('-H', '--host', default='',
+     help='IP address on which to bind the mirror server')
+@arg('-p', '--port', default=8080,
+     help='Port on which to bind the mirror server')
 def serve(opts):
     """
     Run a light-weight HTTP server hosting previously mirrored resources
     """
-    raise NotImplementedError('Serving resources is not yet implemented')
+    os.chdir(opts.output_dir)
+    SocketServer.TCPServer.allow_reuse_address = True
+    httpd = SocketServer.TCPServer(("", opts.port), SimpleHTTPRequestHandler)
+
+    print "Serving at: http://{}:{}/".format(socket.gethostname(), opts.port)
+    httpd.serve_forever()

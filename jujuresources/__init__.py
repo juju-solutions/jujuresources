@@ -1,4 +1,6 @@
 import os
+import contextlib
+from functools import partial
 import hashlib
 import subprocess
 from urlparse import urlparse, urljoin
@@ -30,7 +32,7 @@ def _load_resources(resources_yaml, output_dir=None):
     :param str output_dir: Override the ``output_dir`` option from the file
     """
     if resources_yaml not in resources_cache:
-        with urlopen(resources_yaml) as fp:
+        with contextlib.closing(urlopen(resources_yaml)) as fp:
             resources_cache[resources_yaml] = resdefs = yaml.load(fp)
         output_dir = output_dir or resdefs.get('options', {}).get('output_dir', 'resources')
         resdefs.setdefault('optional_resources', {})
@@ -61,7 +63,7 @@ def _verify_resources(resdefs, resources_to_check):
     return True
 
 
-def _fetch_resources(resdefs, resources_to_fetch, base_url):
+def _fetch_resources(resdefs, resources_to_fetch, base_url, reporthook=None):
     if resources_to_fetch is None:
         resources_to_fetch = resdefs['resources'].keys()
     for name in resources_to_fetch:
@@ -75,7 +77,8 @@ def _fetch_resources(resdefs, resources_to_fetch, base_url):
         if not os.path.exists(os.path.dirname(resource['destination'])):
             os.makedirs(os.path.dirname(resource['destination']))
         try:
-            urlretrieve(url, resource['destination'])
+            _reporthook = partial(reporthook, name) if reporthook else None
+            urlretrieve(url, resource['destination'], _reporthook)
         except IOError:
             continue
 
@@ -99,7 +102,7 @@ def verify_resources(resources_to_check=None, resources_yaml='resources.yaml'):
     return _verify_resources(resdefs, resources_to_check)
 
 
-def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml', base_url=None):
+def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml', base_url=None, reporthook=None):
     """
     Attempt to fetch all resources for a charm.
 
@@ -130,12 +133,12 @@ def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml', ba
         If given, only the filename from the resource definitions are used,
         with the rest of the URL being ignored in favor of the given
         `base_url`.
-    :param str output_dir: Override `output_dir` option from `resources_yaml`
-        (this is intended for mirroring via the CLI and it is not recommended
-        to be used otherwise)
+    :param func reporthook: Callback for reporting download progress.
+        Will be called with the arguments: resource name, current block,
+        block size, and total size.
     """
     resdefs = _load_resources(resources_yaml, None)
-    return _fetch_resources(resdefs, resources_to_fetch, base_url)
+    return _fetch_resources(resdefs, resources_to_fetch, base_url, reporthook)
 
 
 def resource_path(resource_name, resources_yaml='resources.yaml'):
