@@ -126,24 +126,8 @@ def verify(opts):
         return 0
     else:
         if not opts.quiet:
-            print "Invalid or missing: {}".format(', '.join(invalid))
+            print "Invalid or missing resources: {}".format(', '.join(invalid))
         return 1
-
-
-@argset('dest', '-u', '--unit', help='Unit to upload resources to')
-@argset('dest', '-s', '--service', help='Service to upload resources to (all units of)')
-@arg('-r', '--resources', default='resources.yaml',
-     help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
-@arg('-d', '--output-dir', default='resources',
-     help='Directory containing the fetched resources (default ./resources/)')
-def upload(opts):
-    """
-    Upload resources from local copies to a deployed charm
-    """
-    raise NotImplementedError('Uploading resources is not yet implemented')
-    resources = _load_resources(opts.resources)
-    for name, resource in resources.iteritems():
-        pass
 
 
 @arg('-d', '--output-dir', default='resources',

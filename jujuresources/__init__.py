@@ -24,13 +24,6 @@ def config_get(option_name):
 
 
 def _load_resources(resources_yaml, output_dir=None):
-    """
-    Parse ``resources.yaml`` file and remap the values for easier use.
-
-    :param str resources_yaml: Local file or a remote URL where
-        the ``resources.yaml`` file can be found
-    :param str output_dir: Override the ``output_dir`` option from the file
-    """
     if resources_yaml not in resources_cache:
         with contextlib.closing(urlopen(resources_yaml)) as fp:
             resources_cache[resources_yaml] = resdefs = yaml.load(fp)
@@ -97,8 +90,8 @@ def verify_resources(resources_to_check=None, resources_yaml='resources.yaml'):
     :param list resources_to_check: A list of one or more resource names to
         check.  If ommitted, all non-optional resources are verified.
     :param str resources_yaml: Location of the yaml file containing the
-        resource descriptions  Defaults to `resources.yaml` in the current
-        directory.
+        resource descriptions.  Defaults to `resources.yaml` in the current
+        directory.  Can be a local file name or a remote URL.
     :param str output_dir: Override `output_dir` option from `resources_yaml`
         (this is intended for mirroring via the CLI and it is not recommended
         to be used otherwise)
