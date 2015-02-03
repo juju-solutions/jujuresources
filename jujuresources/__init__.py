@@ -18,7 +18,7 @@ def config_get(option_name):
     """
     try:
         raw = subprocess.check_output(['config-get', option_name, '--format=yaml'])
-        return yaml.loads(raw.decode('UTF-8'))
+        return yaml.load(raw.decode('UTF-8'))
     except ValueError:
         return None
 
