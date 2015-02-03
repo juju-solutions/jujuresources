@@ -78,33 +78,59 @@ def resources():
 @arg('-u', '--base-url',
      help='Base URL from which to fetch the resources (if given, only the '
           'filename portion will be used from the resource descriptions)')
+@arg('-a', '--all', action='store_true',
+     help='Include all optional resources as well as required')
+@arg('-q', '--quiet', action='store_true',
+     help='Suppress output and only set the return code')
 def fetch(opts):
     """
     Create a local mirror of all resources (mandatory and optional) for a charm
     """
     resdefs = _load_resources(opts.resources, opts.output_dir)
+    required_resources = resdefs['resources'].keys()
     all_resources = resdefs['all_resources'].keys()
+    to_fetch = all_resources if opts.all else required_resources
 
     def reporthook(name, block, block_size, total_size):
         if name != reporthook.last_name:
-            if reporthook.last_name:
-                print
-            sys.stdout.write('Fetching {}'.format(name))
+            print 'Fetching {}...'.format(name)
             reporthook.last_name = name
-        tenth = int(block * block_size * 10 / total_size)
-        if tenth != reporthook.last_tenth:
-            sys.stdout.write('.' * (tenth - reporthook.last_tenth))
-            reporthook.last_tenth = tenth
-        sys.stdout.flush()
     reporthook.last_name = None
-    reporthook.last_tenth = 0
-    _fetch_resources(resdefs, all_resources, opts.base_url, reporthook=reporthook)
-    print
-    if _verify_resources(resdefs, all_resources):
-        print "All resources successfully downloaded"
+    _fetch_resources(resdefs, to_fetch, opts.base_url, reporthook=None if opts.quiet else reporthook)
+    if _verify_resources(resdefs, to_fetch):
+        if not opts.quiet:
+            print "All resources successfully downloaded"
         return 0
     else:
-        print "One or more resources failed to download correctly"
+        if not opts.quiet:
+            print "One or more resources failed to download correctly"
+        return 1
+
+
+@arg('-r', '--resources', default='resources.yaml',
+     help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
+@arg('-d', '--output-dir', default='resources',
+     help='Directory containing the fetched resources (default ./resources/)')
+@arg('-a', '--all', action='store_true',
+     help='Include all optional resources as well as required')
+@arg('-q', '--quiet', action='store_true',
+     help='Suppress output and only set the return code')
+def verify(opts):
+    """
+    Create a local mirror of all resources (mandatory and optional) for a charm
+    """
+    resdefs = _load_resources(opts.resources, opts.output_dir)
+    required_resources = resdefs['resources'].keys()
+    all_resources = resdefs['all_resources'].keys()
+    to_fetch = all_resources if opts.all else required_resources
+
+    if _verify_resources(resdefs, to_fetch):
+        if not opts.quiet:
+            print "All resources successfully downloaded"
+        return 0
+    else:
+        if not opts.quiet:
+            print "One or more resources missing or invalid"
         return 1
 
 
@@ -134,6 +160,9 @@ def serve(opts):
     """
     Run a light-weight HTTP server hosting previously mirrored resources
     """
+    if not os.path.exists(opts.output_dir):
+        print "Resources dir '{}' not found.  Did you fetch?".format(opts.output_dir)
+        return 1
     os.chdir(opts.output_dir)
     SocketServer.TCPServer.allow_reuse_address = True
     httpd = SocketServer.TCPServer(("", opts.port), SimpleHTTPRequestHandler)

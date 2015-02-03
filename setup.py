@@ -23,6 +23,7 @@ SETUP = {
         ],
         'jujuresources.subcommands': [
             'fetch = jujuresources.cli:fetch',
+            'verify = jujuresources.cli:verify',
             'upload = jujuresources.cli:upload',
             'serve = jujuresources.cli:serve',
         ],
