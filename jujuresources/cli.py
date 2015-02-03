@@ -7,7 +7,7 @@ from SimpleHTTPServer import SimpleHTTPRequestHandler
 import SocketServer
 
 from jujuresources import _fetch_resources
-from jujuresources import _verify_resources
+from jujuresources import _invalid_resources
 from jujuresources import _load_resources
 
 
@@ -82,6 +82,8 @@ def resources():
      help='Include all optional resources as well as required')
 @arg('-q', '--quiet', action='store_true',
      help='Suppress output and only set the return code')
+@arg('-f', '--force', action='store_true',
+     help='Force re-download of valid resources')
 def fetch(opts):
     """
     Create a local mirror of all resources (mandatory and optional) for a charm
@@ -96,15 +98,8 @@ def fetch(opts):
             print 'Fetching {}...'.format(name)
             reporthook.last_name = name
     reporthook.last_name = None
-    _fetch_resources(resdefs, to_fetch, opts.base_url, reporthook=None if opts.quiet else reporthook)
-    if _verify_resources(resdefs, to_fetch):
-        if not opts.quiet:
-            print "All resources successfully downloaded"
-        return 0
-    else:
-        if not opts.quiet:
-            print "One or more resources failed to download correctly"
-        return 1
+    _fetch_resources(resdefs, to_fetch, opts.base_url, force=opts.force, reporthook=None if opts.quiet else reporthook)
+    return verify(opts)
 
 
 @arg('-r', '--resources', default='resources.yaml',
@@ -124,13 +119,14 @@ def verify(opts):
     all_resources = resdefs['all_resources'].keys()
     to_fetch = all_resources if opts.all else required_resources
 
-    if _verify_resources(resdefs, to_fetch):
+    invalid = _invalid_resources(resdefs, to_fetch)
+    if not invalid:
         if not opts.quiet:
             print "All resources successfully downloaded"
         return 0
     else:
         if not opts.quiet:
-            print "One or more resources missing or invalid"
+            print "Invalid or missing: {}".format(', '.join(invalid))
         return 1
 
 

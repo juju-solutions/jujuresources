@@ -48,25 +48,31 @@ def _load_resources(resources_yaml, output_dir=None):
     return resources_cache[resources_yaml]
 
 
-def _verify_resources(resdefs, resources_to_check):
+def _invalid_resources(resdefs, resources_to_check):
+    invalid = set()
     if resources_to_check is None:
         resources_to_check = resdefs['resources'].keys()
     for name in resources_to_check:
         resource = resdefs['all_resources'][name]
         if not os.path.isfile(resource['destination']):
-            return False
+            invalid.add(name)
+            continue
         with open(resource['destination']) as fp:
             hash = hashlib.new(resource['hash_type'])
             hash.update(fp.read())
             if resource['hash'] != hash.hexdigest():
-                return False
-    return True
+                invalid.add(name)
+                continue
+    return invalid
 
 
-def _fetch_resources(resdefs, resources_to_fetch, base_url, reporthook=None):
+def _fetch_resources(resdefs, resources_to_fetch, base_url, force=False, reporthook=None):
     if resources_to_fetch is None:
         resources_to_fetch = resdefs['resources'].keys()
+    invalid = _invalid_resources(resdefs, resources_to_fetch)
     for name in resources_to_fetch:
+        if name not in invalid and not force:
+            continue
         resource = resdefs['all_resources'][name]
         if base_url:
             url = urljoin(base_url, resource['filename'])
@@ -99,10 +105,11 @@ def verify_resources(resources_to_check=None, resources_yaml='resources.yaml'):
     :return: True if all of the resources are available and valid, otherwise False.
     """
     resdefs = _load_resources(resources_yaml, None)
-    return _verify_resources(resdefs, resources_to_check)
+    return not _invalid_resources(resdefs, resources_to_check)
 
 
-def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml', base_url=None, reporthook=None):
+def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml',
+                    base_url=None, force=False, reporthook=None):
     """
     Attempt to fetch all resources for a charm.
 
@@ -133,12 +140,13 @@ def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml', ba
         If given, only the filename from the resource definitions are used,
         with the rest of the URL being ignored in favor of the given
         `base_url`.
+    :param force bool: Force re-downloading of valid resources.
     :param func reporthook: Callback for reporting download progress.
         Will be called with the arguments: resource name, current block,
         block size, and total size.
     """
     resdefs = _load_resources(resources_yaml, None)
-    return _fetch_resources(resdefs, resources_to_fetch, base_url, reporthook)
+    return _fetch_resources(resdefs, resources_to_fetch, base_url, force, reporthook)
 
 
 def resource_path(resource_name, resources_yaml='resources.yaml'):
