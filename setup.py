@@ -29,7 +29,7 @@ SETUP = {
         ],
     },
     'license': "MIT License",
-    'long_description': open('README.txt').read(),
+    'long_description': open('README.rst').read(),
     'description': 'Helpers for Juju Charms to load external resources',
 }
 
