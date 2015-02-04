@@ -1,1 +1,3 @@
 jujuresources.egg-info/
+build/
+dist/
