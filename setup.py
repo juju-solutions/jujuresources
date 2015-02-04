@@ -25,6 +25,7 @@ SETUP = {
             'fetch = jujuresources.cli:fetch',
             'verify = jujuresources.cli:verify',
             'serve = jujuresources.cli:serve',
+            'resource_path = jujuresources.cli:resource_path',
         ],
     },
     'license': "MIT License",

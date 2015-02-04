@@ -84,7 +84,7 @@ def resources():
      help='Suppress output and only set the return code')
 @arg('-f', '--force', action='store_true',
      help='Force re-download of valid resources')
-@arg('resources', type='str', nargs='*',
+@arg('resource_names', nargs='*',
      help='Names of specific resources to fetch (defaults to all required, '
           'or all if --all is given)')
 def fetch(opts):
@@ -94,15 +94,16 @@ def fetch(opts):
     resdefs = _load_resources(opts.resources, opts.output_dir)
     required_resources = resdefs['resources'].keys()
     all_resources = resdefs['all_resources'].keys()
-    if not opts.resources:
-        opts.resources = all_resources if opts.all else required_resources
+    if not opts.resource_names:
+        opts.resource_names = all_resources if opts.all else required_resources
 
     def reporthook(name, block, block_size, total_size):
         if name != reporthook.last_name:
             print 'Fetching {}...'.format(name)
             reporthook.last_name = name
     reporthook.last_name = None
-    _fetch_resources(resdefs, resources, opts.base_url, force=opts.force, reporthook=None if opts.quiet else reporthook)
+    _fetch_resources(resdefs, opts.resource_names, opts.base_url, force=opts.force,
+                     reporthook=None if opts.quiet else reporthook)
     return verify(opts)
 
 
@@ -114,7 +115,7 @@ def fetch(opts):
      help='Include all optional resources as well as required')
 @arg('-q', '--quiet', action='store_true',
      help='Suppress output and only set the return code')
-@arg('resources', type='str', nargs='*',
+@arg('resource_names', nargs='*',
      help='Names of specific resources to verify (defaults to all required, '
           'or all if --all is given)')
 def verify(opts):
@@ -125,9 +126,9 @@ def verify(opts):
     required_resources = resdefs['resources'].keys()
     all_resources = resdefs['all_resources'].keys()
     if not opts.resources:
-        opts.resources = all_resources if opts.all else required_resources
+        opts.resource_names = all_resources if opts.all else required_resources
 
-    invalid = _invalid_resources(resdefs, resources)
+    invalid = _invalid_resources(resdefs, opts.resource_names)
     if not invalid:
         if not opts.quiet:
             print "All resources successfully downloaded"
@@ -136,6 +137,22 @@ def verify(opts):
         if not opts.quiet:
             print "Invalid or missing resources: {}".format(', '.join(invalid))
         return 1
+
+
+@arg('-r', '--resources', default='resources.yaml',
+     help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
+@arg('-d', '--output-dir', default='resources',
+     help='Directory containing the fetched resources (default ./resources/)')
+@arg('resource_name', help='Name of a resource')
+def resource_path(opts):
+    """
+    Return the full path to a named resource.
+    """
+    resdefs = _load_resources(opts.resources, opts.output_dir)
+    if opts.resource_name not in resdefs['all_resources']:
+        sys.stderr.write('Invalid resource name: {}'.format(opts.resource_name))
+        return 1
+    print resdefs['all_resources'][opts.resource_name]['destination']
 
 
 @arg('-d', '--output-dir', default='resources',

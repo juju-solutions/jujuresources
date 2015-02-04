@@ -9,6 +9,7 @@ from urllib import urlretrieve, urlopen
 import yaml
 
 
+__all__ = ['fetch_resources', 'verify_resources', 'resource_path']
 resources_cache = {}
 
 
@@ -45,6 +46,8 @@ def _invalid_resources(resdefs, resources_to_check):
     invalid = set()
     if resources_to_check is None:
         resources_to_check = resdefs['resources'].keys()
+    if not isinstance(resources_to_check, list):
+        resources_to_check = [resources_to_check]
     for name in resources_to_check:
         resource = resdefs['all_resources'][name]
         if not os.path.isfile(resource['destination']):
@@ -62,6 +65,8 @@ def _invalid_resources(resdefs, resources_to_check):
 def _fetch_resources(resdefs, resources_to_fetch, base_url, force=False, reporthook=None):
     if resources_to_fetch is None:
         resources_to_fetch = resdefs['resources'].keys()
+    if not isinstance(resources_to_fetch, list):
+        resources_to_fetch = [resources_to_fetch]
     invalid = _invalid_resources(resdefs, resources_to_fetch)
     for name in resources_to_fetch:
         if name not in invalid and not force:
