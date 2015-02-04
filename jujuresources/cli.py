@@ -84,6 +84,9 @@ def resources():
      help='Suppress output and only set the return code')
 @arg('-f', '--force', action='store_true',
      help='Force re-download of valid resources')
+@arg('resources', type='str', nargs='*',
+     help='Names of specific resources to fetch (defaults to all required, '
+          'or all if --all is given)')
 def fetch(opts):
     """
     Create a local mirror of all resources (mandatory and optional) for a charm
@@ -91,14 +94,15 @@ def fetch(opts):
     resdefs = _load_resources(opts.resources, opts.output_dir)
     required_resources = resdefs['resources'].keys()
     all_resources = resdefs['all_resources'].keys()
-    to_fetch = all_resources if opts.all else required_resources
+    if not opts.resources:
+        opts.resources = all_resources if opts.all else required_resources
 
     def reporthook(name, block, block_size, total_size):
         if name != reporthook.last_name:
             print 'Fetching {}...'.format(name)
             reporthook.last_name = name
     reporthook.last_name = None
-    _fetch_resources(resdefs, to_fetch, opts.base_url, force=opts.force, reporthook=None if opts.quiet else reporthook)
+    _fetch_resources(resdefs, resources, opts.base_url, force=opts.force, reporthook=None if opts.quiet else reporthook)
     return verify(opts)
 
 
@@ -110,6 +114,9 @@ def fetch(opts):
      help='Include all optional resources as well as required')
 @arg('-q', '--quiet', action='store_true',
      help='Suppress output and only set the return code')
+@arg('resources', type='str', nargs='*',
+     help='Names of specific resources to verify (defaults to all required, '
+          'or all if --all is given)')
 def verify(opts):
     """
     Create a local mirror of all resources (mandatory and optional) for a charm
@@ -117,9 +124,10 @@ def verify(opts):
     resdefs = _load_resources(opts.resources, opts.output_dir)
     required_resources = resdefs['resources'].keys()
     all_resources = resdefs['all_resources'].keys()
-    to_fetch = all_resources if opts.all else required_resources
+    if not opts.resources:
+        opts.resources = all_resources if opts.all else required_resources
 
-    invalid = _invalid_resources(resdefs, to_fetch)
+    invalid = _invalid_resources(resdefs, resources)
     if not invalid:
         if not opts.quiet:
             print "All resources successfully downloaded"
