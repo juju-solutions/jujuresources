@@ -9,7 +9,7 @@ from urllib import urlretrieve, urlopen
 import yaml
 
 
-__all__ = ['fetch_resources', 'verify_resources', 'resource_path', 'config_get']
+__all__ = ['fetch', 'verify', 'resource_path', 'config_get']
 resources_cache = {}
 
 
@@ -95,7 +95,7 @@ def _fetch_resources(resdefs, resources_to_fetch, base_url, force=False, reporth
             continue
 
 
-def verify_resources(resources_to_check=None, resources_yaml='resources.yaml'):
+def verify(resources_to_check=None, resources_yaml='resources.yaml'):
     """
     Verify if some or all resources previously fetched with :func:`fetch_resources`,
     including validating their cryptographic hash.
@@ -116,8 +116,8 @@ def verify_resources(resources_to_check=None, resources_yaml='resources.yaml'):
     return not _invalid_resources(resdefs, resources_to_check)
 
 
-def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml',
-                    base_url=None, force=False, reporthook=None):
+def fetch(resources_to_fetch=None, resources_yaml='resources.yaml',
+          base_url=None, force=False, reporthook=None):
     """
     Attempt to fetch all resources for a charm.
 

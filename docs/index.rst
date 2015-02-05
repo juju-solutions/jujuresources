@@ -15,9 +15,16 @@ as well as to prototype what features are needed.
 
 Using Juju Resources in a Charm requires defining a set of resources in
 a :doc:`resources.yaml <resource_definitions>` file, and then using the Python
-API or the command-line to :func:`fetch <jujuresources.fetch_resources>`,
-:func:`verify <jujuresources.verify_resources>`, and
+API or the command-line to :func:`fetch <jujuresources.fetch>`,
+:func:`verify <jujuresources.verify>`, and
 :func:`reference <jujuresources.resource_path>` the resources.
+
+If you are going to deploy one or more Charms that uses Juju Resources in an
+environment with limited network connectivity, you can also manually create a
+mirror of the Charms' resources by using the command-line to
+:func:`fetch <jujuresources.cli.fetch>` them ahead of time, when you have
+network access, and then :func:`serve <jujuresources.cli.serve>` the resources
+to the charms when you deploy them.
 
 .. toctree::
    :maxdepth: 3

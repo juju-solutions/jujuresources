@@ -12,9 +12,10 @@ class CLIDoc(sphinx.ext.autodoc.FunctionDocumenter):
     Automatically generate documentation for CLI entry-points.
     """
 
-    def format_name(self):
-        if not is_cli(self.object):
-            return super(CLIDoc, self).format_name()
+    def _get_usage(self):
+        """
+        Build usage string from argparser args.
+        """
         parser = argparse.ArgumentParser()
         parser.prog = 'juju-resources {}'.format(self.object_name)
         for set_name, set_args in getattr(self.object, '_subcommand_argsets', {}).items():
@@ -23,28 +24,29 @@ class CLIDoc(sphinx.ext.autodoc.FunctionDocumenter):
         for ap_args, ap_kwargs in getattr(self.object, '_subcommand_args', []):
             parser.add_argument(*ap_args, **ap_kwargs)
         usage = parser.format_usage()
-        usage = re.sub(r'^usage: ', '', usage)
         usage = re.sub(r'\n *', ' ', usage)
         return usage.strip()
 
-    def format_args(self):
-        if not is_cli(self.object):
-            return super(CLIDoc, self).format_args()
-        return None
-
     def add_content(self, more_content, no_docstring=False):
+        if is_cli(self.object):
+            # add usage
+            self.add_line('**%s**' % self._get_usage(), '<clidoc>')
+            self.add_line('', '<clidoc>')
+
+        # add description
         super(CLIDoc, self).add_content(more_content, no_docstring)
-        if not is_cli(self.object):
-            return
-        sourcename = u'args of %s' % self.fullname
-        lines = []
-        for set_name, set_args in getattr(self.object, '_subcommand_argsets', {}).items():
-            for ap_args, ap_kwargs in set_args:
-                lines.append(':param {}: {}'.format(' '.join(ap_args), ap_kwargs.get['help']))
-        for ap_args, ap_kwargs in getattr(self.object, '_subcommand_args', []):
-            lines.append(':param {}: {}'.format(' '.join(ap_args), ap_kwargs['help']))
-        for i, line in enumerate(lines):
-            self.add_line(line, sourcename, i)
+
+        if is_cli(self.object):
+            # add parameter docs
+            sourcename = u'args of %s' % self.fullname
+            lines = []
+            for set_name, set_args in getattr(self.object, '_subcommand_argsets', {}).items():
+                for ap_args, ap_kwargs in set_args:
+                    lines.append(':param {}: {}'.format(' '.join(ap_args), ap_kwargs.get['help']))
+            for ap_args, ap_kwargs in getattr(self.object, '_subcommand_args', []):
+                lines.append(':param {}: {}'.format(' '.join(ap_args), ap_kwargs['help']))
+            for i, line in enumerate(lines):
+                self.add_line(line, sourcename, i)
 
 
 def filter_cli(app, what, name, obj, skip, options):
