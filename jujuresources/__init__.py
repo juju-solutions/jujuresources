@@ -9,8 +9,12 @@ from urllib import urlretrieve, urlopen
 import yaml
 
 
-__all__ = ['fetch_resources', 'verify_resources', 'resource_path']
+__all__ = ['fetch_resources', 'verify_resources', 'resource_path', 'config_get']
 resources_cache = {}
+
+
+class ALL(object):
+    pass
 
 
 def config_get(option_name):
@@ -46,6 +50,8 @@ def _invalid_resources(resdefs, resources_to_check):
     invalid = set()
     if not resources_to_check:
         resources_to_check = resdefs['resources'].keys()
+    if resources_to_check is ALL:
+        resources_to_check = resdefs['all_resources'].keys()
     if not isinstance(resources_to_check, list):
         resources_to_check = [resources_to_check]
     for name in resources_to_check:
@@ -65,6 +71,8 @@ def _invalid_resources(resdefs, resources_to_check):
 def _fetch_resources(resdefs, resources_to_fetch, base_url, force=False, reporthook=None):
     if not resources_to_fetch:
         resources_to_fetch = resdefs['resources'].keys()
+    if resources_to_fetch is ALL:
+        resources_to_fetch = resdefs['all_resources'].keys()
     if not isinstance(resources_to_fetch, list):
         resources_to_fetch = [resources_to_fetch]
     invalid = _invalid_resources(resdefs, resources_to_fetch)
@@ -94,10 +102,12 @@ def verify_resources(resources_to_check=None, resources_yaml='resources.yaml'):
 
     :param list resources_to_check: A list of one or more resource names to
         check.  If ommitted, all non-optional resources are verified.
+        You can also pass ``jujuresources.ALL`` to fetch all optional and
+        required resources.
     :param str resources_yaml: Location of the yaml file containing the
-        resource descriptions.  Defaults to `resources.yaml` in the current
-        directory.  Can be a local file name or a remote URL.
-    :param str output_dir: Override `output_dir` option from `resources_yaml`
+        resource descriptions (default: ``resources.yaml``).
+        Can be a local file name or a remote URL.
+    :param str output_dir: Override ``output_dir`` option from `resources_yaml`
         (this is intended for mirroring via the CLI and it is not recommended
         to be used otherwise)
     :return: True if all of the resources are available and valid, otherwise False.
@@ -111,33 +121,22 @@ def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml',
     """
     Attempt to fetch all resources for a charm.
 
-    Resources are described in a `resources.yaml` file, which should contain
-    a `resources` item containing a mapping of resource names to definitions.
-    Definitions should be mappings with the following keys:
-
-      * *url* URL for the resource
-      * *hash* Cryptographic hash for the resource
-      * *hash_type* Algorithm used to generate the hash; e.g., md5, sha512, etc.
-
-    The file may also contain an `options` section, which supports the
-    following options:
-
-      * *output_dir* Location for the fetched resources (default `./resources`)
-
     Note that errors fetching resources, incomplete or corrupted downloads,
-    and other issues are silently ignored.  You should *always* call
+    and other issues are silently ignored.  You should **always** call
     :func:`verify_resources` after this to confirm that everything was
     retrieved successfully.
 
     :param list resources_to_fetch: A list of one or more resource names to
         fetch.  If ommitted, all non-optional resources are fetched.
+        You can also pass ``jujuresources.ALL`` to fetch all optional and
+        required resources.
     :param str resources_yaml: Location of the yaml file containing the
-        resource descriptions  Defaults to `resources.yaml` in the current
-        directory.  Can be a local file name or a remote URL.
+        resource descriptions (default: ``./resources.yaml``).
+        Can be a local file name or a remote URL.
     :param str base_url: Override the location to fetch all resources from.
         If given, only the filename from the resource definitions are used,
         with the rest of the URL being ignored in favor of the given
-        `base_url`.
+        ``base_url``.
     :param force bool: Force re-downloading of valid resources.
     :param func reporthook: Callback for reporting download progress.
         Will be called with the arguments: resource name, current block,
@@ -150,6 +149,11 @@ def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml',
 def resource_path(resource_name, resources_yaml='resources.yaml'):
     """
     Get the destination path for a named resource.
+
+    :param str resource_name: The name of a resource to resolve.
+    :param str resources_yaml: Location of the yaml file containing the
+        resource descriptions (default: ``./resources.yaml``).
+        Can be a local file name or a remote URL.
     """
     resdefs = _load_resources(resources_yaml, None)
     return resdefs['all_resources'][resource_name]['destination']

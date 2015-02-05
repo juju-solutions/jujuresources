@@ -91,7 +91,7 @@ def reporthook(quiet):
 @arg('-r', '--resources', default='resources.yaml',
      help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
 @arg('-d', '--output-dir', default=None,
-     help='Directory to place the fetched resources (default ./resources/)')
+     help='Directory to place the fetched resources (default: ./resources/)')
 @arg('-u', '--base-url',
      help='Base URL from which to fetch the resources (if given, only the '
           'filename portion will be used from the resource descriptions)')
@@ -121,7 +121,7 @@ def fetch(opts):
 @arg('-r', '--resources', default='resources.yaml',
      help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
 @arg('-d', '--output-dir', default=None,
-     help='Directory containing the fetched resources (default ./resources/)')
+     help='Directory containing the fetched resources (default: ./resources/)')
 @arg('-a', '--all', action='store_true',
      help='Include all optional resources as well as required')
 @arg('-q', '--quiet', action='store_true',
@@ -153,7 +153,7 @@ def verify(opts):
 @arg('-r', '--resources', default='resources.yaml',
      help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
 @arg('-d', '--output-dir', default=None,
-     help='Directory containing the fetched resources (default ./resources/)')
+     help='Directory containing the fetched resources (default: ./resources/)')
 @arg('resource_name', help='Name of a resource')
 def resource_path(opts):
     """
@@ -169,7 +169,7 @@ def resource_path(opts):
 @arg('-r', '--resources', default='resources.yaml',
      help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
 @arg('-d', '--output-dir', default=None,
-     help='Directory containing the fetched resources (default ./resources/)')
+     help='Directory containing the fetched resources (default: ./resources/)')
 @arg('-H', '--host', default='',
      help='IP address on which to bind the mirror server')
 @arg('-p', '--port', default=8080,
