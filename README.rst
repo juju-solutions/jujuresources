@@ -36,8 +36,7 @@ and verify resources, either in Python::
 
     from jujuresources import fetch_resources, verify_resources, config_get
 
-    fetch_resources(base_url=config_get('resources_mirror'))
-    if not verify_resources():
+    if not fetch_resources(base_url=config_get('resources_mirror')):
         print "Mandatory resources did not download; check resources_mirror option"
         sys.exit(1)
 
@@ -47,8 +46,7 @@ and verify resources, either in Python::
 
 Or via the command-line / bash::
 
-    juju-resources fetch -u `config-get resources_mirror`
-    if ! juju-resources verify; then
+    if ! juju-resources fetch -u `config-get resources_mirror`; then
         echo "Mandatory resources did not download; check resources_mirror option"
         exit 1
     fi
@@ -62,7 +60,8 @@ Or via the command-line / bash::
 Mirroring Resources
 -------------------
 
-You can also create a local mirror for deploying in network-restricted environments::
+If you will need to deploy charms in an environment with limited network access,
+you can create a mirror ahead of time, or on a gateway node which has access::
 
     mkdir local_mirror
     juju-resources fetch --all -d local_mirror -r http://github.com/me/my-charm/blob/master/resources.yaml
@@ -73,3 +72,8 @@ charm's ``resources_mirror`` (or equivalent) config option to point to,
 serving all (``--all``, optional as well as required) resources defined in the
 remote ``resources.yaml`` (``-r <url-or-file>``), which are cached in the
 ``local_mirror`` directory (``-d local_mirror``).
+
+Note that the charms will need to be able to see the machine you create the
+mirror on, and the charms must support a config option to point Juju Resources
+to the mirror (as well as handle the possibility that their resources may not
+be available when they are first deployed).

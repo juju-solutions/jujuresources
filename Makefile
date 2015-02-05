@@ -69,4 +69,4 @@ docs:
 .PHONY: docs
 
 release: docs
-	$(PYTHON) setup.py sdist upload upload_sphinx
+	$(PYTHON) setup.py register sdist upload upload_docs

@@ -121,11 +121,6 @@ def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml',
     """
     Attempt to fetch all resources for a charm.
 
-    Note that errors fetching resources, incomplete or corrupted downloads,
-    and other issues are silently ignored.  You should **always** call
-    :func:`verify_resources` after this to confirm that everything was
-    retrieved successfully.
-
     :param list resources_to_fetch: A list of one or more resource names to
         fetch.  If ommitted, all non-optional resources are fetched.
         You can also pass ``jujuresources.ALL`` to fetch all optional and
@@ -141,9 +136,12 @@ def fetch_resources(resources_to_fetch=None, resources_yaml='resources.yaml',
     :param func reporthook: Callback for reporting download progress.
         Will be called with the arguments: resource name, current block,
         block size, and total size.
+    :return: True or False indicating whether the resources were successfully
+        downloaded.
     """
     resdefs = _load_resources(resources_yaml, None)
-    return _fetch_resources(resdefs, resources_to_fetch, base_url, force, reporthook)
+    _fetch_resources(resdefs, resources_to_fetch, base_url, force, reporthook)
+    return not _invalid_resources(resdefs, resources_to_fetch)
 
 
 def resource_path(resource_name, resources_yaml='resources.yaml'):
