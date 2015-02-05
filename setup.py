@@ -13,7 +13,7 @@ SETUP = {
     'version': VERSION,
     'author': "Cory Johns",
     'author_email': "cory.johns@canonical.com",
-    'url': "https://code.launchpad.net/~johnsca/jujuresources",
+    'url': "https://github.com/juju-solutions/jujuresources",
     'packages': [
         "jujuresources",
     ],
