@@ -34,14 +34,14 @@ such as::
 Then, once the charm has installed Juju Resources, it can fetch
 and verify resources, either in Python::
 
-    from jujuresources import fetch_resources, verify_resources, config_get
+    from jujuresources import fetch, verify, config_get
 
-    if not fetch_resources(base_url=config_get('resources_mirror')):
+    if not fetch(base_url=config_get('resources_mirror')):
         print "Mandatory resources did not download; check resources_mirror option"
         sys.exit(1)
 
-    fetch_resources('my_optional_resource', base_url=config_get('resources_mirror'))
-    if verify_resources('my_optional_resource'):
+    fetch('my_optional_resource', base_url=config_get('resources_mirror'))
+    if verify('my_optional_resource'):
         install_tgz(resource_path('my_optional_resource'))
 
 Or via the command-line / bash::
