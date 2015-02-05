@@ -11,8 +11,8 @@ with open(version_file) as v:
 SETUP = {
     'name': "jujuresources",
     'version': VERSION,
-    'author': "Ubuntu Developers",
-    'author_email': "ubuntu-devel-discuss@lists.ubuntu.com",
+    'author': "Cory Johns",
+    'author_email': "cory.johns@canonical.com",
     'url': "https://code.launchpad.net/~johnsca/jujuresources",
     'packages': [
         "jujuresources",

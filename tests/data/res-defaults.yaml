@@ -1,0 +1,16 @@
+resources:
+    foo:
+        url: http://foo.com/foo.tgz
+        hash: deadbeef1
+        hash_type: nonce
+    bar:
+        url: http://bar.com/bar.tgz
+        hash: deadbeef2
+        hash_type: nonce
+        filename: BAR
+        destination: custom/bar
+optional_resources:
+    qux:
+        url: http://qux.com/qux.tgz
+        hash: deadbeef3
+        hash_type: nonce

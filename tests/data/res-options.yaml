@@ -1,0 +1,7 @@
+options:
+    output_dir: custom
+resources:
+    foo:
+        url: http://foo.com/foo.tgz
+        hash: deadbeef1
+        hash_type: nonce

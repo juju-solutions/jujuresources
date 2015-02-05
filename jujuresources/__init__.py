@@ -25,10 +25,10 @@ def config_get(option_name):
 
 
 def _load_resources(resources_yaml, output_dir=None):
-    if resources_yaml not in resources_cache:
+    if (resources_yaml, output_dir) not in resources_cache:
         with contextlib.closing(urlopen(resources_yaml)) as fp:
-            resources_cache[resources_yaml] = resdefs = yaml.load(fp)
-        output_dir = output_dir or resdefs.get('options', {}).get('output_dir', 'resources')
+            resources_cache[(resources_yaml, output_dir)] = resdefs = yaml.load(fp)
+        _output_dir = output_dir or resdefs.get('options', {}).get('output_dir', 'resources')
         resdefs.setdefault('optional_resources', {})
         resdefs['all_resources'] = dict(resdefs['resources'], **resdefs['optional_resources'])
         for name, resource in resdefs['all_resources'].iteritems():
@@ -38,13 +38,13 @@ def _load_resources(resources_yaml, output_dir=None):
             resource.setdefault(
                 'filename', os.path.basename(urlparse(resource['url']).path))
             resource.setdefault(
-                'destination', os.path.join(output_dir, resource['filename']))
-    return resources_cache[resources_yaml]
+                'destination', os.path.join(_output_dir, resource['filename']))
+    return resources_cache[(resources_yaml, output_dir)]
 
 
 def _invalid_resources(resdefs, resources_to_check):
     invalid = set()
-    if resources_to_check is None:
+    if not resources_to_check:
         resources_to_check = resdefs['resources'].keys()
     if not isinstance(resources_to_check, list):
         resources_to_check = [resources_to_check]
@@ -63,7 +63,7 @@ def _invalid_resources(resdefs, resources_to_check):
 
 
 def _fetch_resources(resdefs, resources_to_fetch, base_url, force=False, reporthook=None):
-    if resources_to_fetch is None:
+    if not resources_to_fetch:
         resources_to_fetch = resdefs['resources'].keys()
     if not isinstance(resources_to_fetch, list):
         resources_to_fetch = [resources_to_fetch]
