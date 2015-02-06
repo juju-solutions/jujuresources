@@ -7,9 +7,10 @@ from pkg_resources import iter_entry_points
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 import SocketServer
 
-from jujuresources import _fetch_resources
-from jujuresources import _invalid_resources
-from jujuresources import _load_resources
+from jujuresources import _fetch
+from jujuresources import _invalid
+from jujuresources import _load
+from jujuresources import ALL
 
 
 def arg(*args, **kwargs):
@@ -76,25 +77,12 @@ def resources(argv=sys.argv[1:]):
         return _exit(opts.subcommand(opts) or 0)
 
 
-def reporthook(quiet):
-    if quiet:
-        return None
-    closure_data = {'last_name': None}  # gotta love closure scoping rules :/
-
-    def _reporthook(name, block, block_size, total_size):
-        if name != closure_data['last_name']:
-            print('Fetching {}...'.format(name))
-            closure_data['last_name'] = name
-    return _reporthook
-
-
 @arg('-r', '--resources', default='resources.yaml',
      help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
 @arg('-d', '--output-dir', default=None,
      help='Directory to place the fetched resources (default: ./resources/)')
-@arg('-u', '--base-url',
-     help='Base URL from which to fetch the resources (if given, only the '
-          'filename portion will be used from the resource descriptions)')
+@arg('-u', '--mirror-url',
+     help='URL at which the resources are mirrored')
 @arg('-a', '--all', action='store_true',
      help='Include all optional resources as well as required')
 @arg('-q', '--quiet', action='store_true',
@@ -108,13 +96,11 @@ def fetch(opts):
     """
     Create a local mirror of all resources (mandatory and optional) for a charm
     """
-    resdefs = _load_resources(opts.resources, opts.output_dir)
-    required_resources = resdefs['resources'].keys()
-    all_resources = resdefs['all_resources'].keys()
-    if not opts.resource_names:
-        opts.resource_names = all_resources if opts.all else required_resources
-    _fetch_resources(resdefs, opts.resource_names, opts.mirror_url,
-                     opts.force, reporthook(opts.quiet))
+    resources = _load(opts.resources, opts.output_dir)
+    if opts.all:
+        opts.resource_names = ALL
+    reporthook = None if opts.quiet else lambda name: print('Fetching {}...'.format(name))
+    _fetch(resources, opts.resource_names, opts.mirror_url, opts.force, reporthook)
     return verify(opts)
 
 
@@ -133,13 +119,10 @@ def verify(opts):
     """
     Create a local mirror of all resources (mandatory and optional) for a charm
     """
-    resdefs = _load_resources(opts.resources, opts.output_dir)
-    required_resources = resdefs['resources'].keys()
-    all_resources = resdefs['all_resources'].keys()
-    if not opts.resource_names:
-        opts.resource_names = all_resources if opts.all else required_resources
-
-    invalid = _invalid_resources(resdefs, opts.resource_names)
+    resources = _load(opts.resources, opts.output_dir)
+    if opts.all:
+        opts.resource_names = ALL
+    invalid = _invalid(resources, opts.resource_names)
     if not invalid:
         if not opts.quiet:
             print("All resources successfully downloaded")
@@ -159,11 +142,11 @@ def resource_path(opts):
     """
     Return the full path to a named resource.
     """
-    resdefs = _load_resources(opts.resources, opts.output_dir)
-    if opts.resource_name not in resdefs['all_resources']:
+    resources = _load(opts.resources, opts.output_dir)
+    if opts.resource_name not in resources:
         sys.stderr.write('Invalid resource name: {}\n'.format(opts.resource_name))
         return 1
-    print(resdefs['all_resources'][opts.resource_name]['destination'])
+    print(resources[opts.resource_name].destination)
 
 
 @arg('-r', '--resources', default='resources.yaml',
@@ -172,15 +155,14 @@ def resource_path(opts):
      help='Directory containing the fetched resources (default: ./resources/)')
 @arg('-H', '--host', default='',
      help='IP address on which to bind the mirror server')
-@arg('-p', '--port', default=8080,
+@arg('-p', '--port', type=int, default=8080,
      help='Port on which to bind the mirror server')
 def serve(opts):
     """
     Run a light-weight HTTP server hosting previously mirrored resources
     """
-    if not opts.output_dir:
-        resdefs = _load_resources(opts.resources, opts.output_dir)
-        opts.output_dir = resdefs.get('options', {}).get('output_dir', 'resources')
+    resources = _load(opts.resources, opts.output_dir)
+    opts.output_dir = resources.output_dir  # allow resources.yaml to set default output_dir
     if not os.path.exists(opts.output_dir):
         sys.stderr.write("Resources dir '{}' not found.  Did you fetch?\n".format(opts.output_dir))
         return 1

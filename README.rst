@@ -73,7 +73,7 @@ serving all (``--all``, optional as well as required) resources defined in the
 remote ``resources.yaml`` (``-r <url-or-file>``), which are cached in the
 ``local_mirror`` directory (``-d local_mirror``).
 
-Note that the charms will need to be able to see the machine you create the
-mirror on, and the charms must support a config option to point Juju Resources
+Note that the charms will need to be able to access the machine and port you run
+the mirror on, and the charms must support a config option to point Juju Resources
 to the mirror (as well as handle the possibility that their resources may not
 be available when they are first deployed).

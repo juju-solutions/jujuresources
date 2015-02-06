@@ -1,20 +1,15 @@
-import os
 import contextlib
-from functools import partial
-import hashlib
 import subprocess
-from urlparse import urlparse, urljoin
-from urllib import urlretrieve, urlopen
+from urllib import urlopen
 
 import yaml
 
+from jujuresources.backend import ResourceContainer
+from jujuresources.backend import ALL
 
-__all__ = ['fetch', 'verify', 'resource_path', 'config_get']
+
+__all__ = ['fetch', 'verify', 'resource_path', 'config_get', 'ALL']
 resources_cache = {}
-
-
-class ALL(object):
-    pass
 
 
 def config_get(option_name):
@@ -28,79 +23,61 @@ def config_get(option_name):
         return None
 
 
-def _load_resources(resources_yaml, output_dir=None):
+def _load(resources_yaml, output_dir=None):
     if (resources_yaml, output_dir) not in resources_cache:
         with contextlib.closing(urlopen(resources_yaml)) as fp:
-            resources_cache[(resources_yaml, output_dir)] = resdefs = yaml.load(fp)
+            resdefs = yaml.load(fp)
         _output_dir = output_dir or resdefs.get('options', {}).get('output_dir', 'resources')
-        resdefs.setdefault('optional_resources', {})
-        resdefs['all_resources'] = dict(resdefs['resources'], **resdefs['optional_resources'])
-        for name, resource in resdefs['all_resources'].iteritems():
-            resource.setdefault('url', '')
-            resource.setdefault('hash', '')
-            resource.setdefault('hash_type', '')
-            resource.setdefault(
-                'filename', os.path.basename(urlparse(resource['url']).path))
-            resource.setdefault(
-                'destination', os.path.join(_output_dir, resource['filename']))
+        resources = ResourceContainer(_output_dir)
+        for name, resource in resdefs.get('resources', {}).iteritems():
+            resources.add_required(name, resource)
+        for name, resource in resdefs.get('optional_resources', {}).iteritems():
+            resources.add_optional(name, resource)
+        resources_cache[(resources_yaml, output_dir)] = resources
     return resources_cache[(resources_yaml, output_dir)]
 
 
-def _invalid_resources(resdefs, resources_to_check):
+def _invalid(resources, which):
     invalid = set()
-    if not resources_to_check:
-        resources_to_check = resdefs['resources'].keys()
-    if resources_to_check is ALL:
-        resources_to_check = resdefs['all_resources'].keys()
-    if not isinstance(resources_to_check, list):
-        resources_to_check = [resources_to_check]
-    for name in resources_to_check:
-        resource = resdefs['all_resources'][name]
-        if not os.path.isfile(resource['destination']):
-            invalid.add(name)
-            continue
-        with open(resource['destination']) as fp:
-            hash = hashlib.new(resource['hash_type'])
-            hash.update(fp.read())
-            if resource['hash'] != hash.hexdigest():
-                invalid.add(name)
-                continue
+    for resource in resources.subset(which):
+        if not resource.verify():
+            invalid.add(resource.name)
     return invalid
 
 
-def _fetch_resources(resdefs, resources_to_fetch, mirror_url, force=False, reporthook=None):
-    if not resources_to_fetch:
-        resources_to_fetch = resdefs['resources'].keys()
-    if resources_to_fetch is ALL:
-        resources_to_fetch = resdefs['all_resources'].keys()
-    if not isinstance(resources_to_fetch, list):
-        resources_to_fetch = [resources_to_fetch]
-    invalid = _invalid_resources(resdefs, resources_to_fetch)
-    for name in resources_to_fetch:
-        if name not in invalid and not force:
+def _fetch(resources, which, mirror_url, force=False, reporthook=None):
+    invalid = _invalid(resources, which)
+    for resource in resources.subset(which):
+        if resource.name not in invalid and not force:
             continue
-        resource = resdefs['all_resources'][name]
-        if mirror_url:
-            url = urljoin(mirror_url, resource['filename'])
-        else:
-            url = resource['url']
-        if url.startswith('./'):
-            url = url[2:]  # urlretrieve complains about this for some reason
-        if not os.path.exists(os.path.dirname(resource['destination'])):
-            os.makedirs(os.path.dirname(resource['destination']))
-        try:
-            _reporthook = partial(reporthook, name) if reporthook else None
-            urlretrieve(url, resource['destination'], _reporthook)
-        except IOError:
-            continue
+        if reporthook:
+            reporthook(resource.name)
+        resource.fetch(mirror_url)
 
 
-def verify(resources_to_check=None, resources_yaml='resources.yaml'):
+def invalid(which=None, resources_yaml='resources.yaml'):
+    """
+    Return a list of the names of the resources which do not
+    pass :func:`verify`.
+
+    :param list which: A name, or a list of one or more resource names, to
+        fetch.  If ommitted, all non-optional resources are verified.
+        You can also pass ``jujuresources.ALL`` to fetch all optional *and*
+        required resources.
+    :param str resources_yaml: Location of the yaml file containing the
+        resource descriptions (default: ``./resources.yaml``).
+        Can be a local file name or a remote URL.
+    """
+    resources = _load(resources_yaml, None)
+    return _invalid(resources, which)
+
+
+def verify(which=None, resources_yaml='resources.yaml'):
     """
     Verify if some or all resources previously fetched with :func:`fetch_resources`,
     including validating their cryptographic hash.
 
-    :param list resources_to_check: A list of one or more resource names to
+    :param list which: A list of one or more resource names to
         check.  If ommitted, all non-optional resources are verified.
         You can also pass ``jujuresources.ALL`` to fetch all optional and
         required resources.
@@ -112,18 +89,18 @@ def verify(resources_to_check=None, resources_yaml='resources.yaml'):
         to be used otherwise)
     :return: True if all of the resources are available and valid, otherwise False.
     """
-    resdefs = _load_resources(resources_yaml, None)
-    return not _invalid_resources(resdefs, resources_to_check)
+    resources = _load(resources_yaml, None)
+    return not _invalid(resources, which)
 
 
-def fetch(resources_to_fetch=None, resources_yaml='resources.yaml',
+def fetch(which=None, resources_yaml='resources.yaml',
           mirror_url=None, force=False, reporthook=None):
     """
     Attempt to fetch all resources for a charm.
 
-    :param list resources_to_fetch: A list of one or more resource names to
+    :param list which: A name, or a list of one or more resource names, to
         fetch.  If ommitted, all non-optional resources are fetched.
-        You can also pass ``jujuresources.ALL`` to fetch all optional and
+        You can also pass ``jujuresources.ALL`` to fetch all optional *and*
         required resources.
     :param str resources_yaml: Location of the yaml file containing the
         resource descriptions (default: ``./resources.yaml``).
@@ -134,14 +111,14 @@ def fetch(resources_to_fetch=None, resources_yaml='resources.yaml',
         ``mirror_url``.
     :param force bool: Force re-downloading of valid resources.
     :param func reporthook: Callback for reporting download progress.
-        Will be called with the arguments: resource name, current block,
-        block size, and total size.
+        Will be called once for each resource, just prior to fetching, and will
+        be passed the resource name.
     :return: True or False indicating whether the resources were successfully
         downloaded.
     """
-    resdefs = _load_resources(resources_yaml, None)
-    _fetch_resources(resdefs, resources_to_fetch, mirror_url, force, reporthook)
-    return not _invalid_resources(resdefs, resources_to_fetch)
+    resources = _load(resources_yaml, None)
+    _fetch(resources, which, mirror_url, force, reporthook)
+    return not _invalid(resources, which)
 
 
 def resource_path(resource_name, resources_yaml='resources.yaml'):
@@ -153,5 +130,5 @@ def resource_path(resource_name, resources_yaml='resources.yaml'):
         resource descriptions (default: ``./resources.yaml``).
         Can be a local file name or a remote URL.
     """
-    resdefs = _load_resources(resources_yaml, None)
-    return resdefs['all_resources'][resource_name]['destination']
+    resources = _load(resources_yaml, None)
+    return resources[resource_name].destination

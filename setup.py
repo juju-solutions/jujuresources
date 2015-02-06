@@ -17,6 +17,9 @@ SETUP = {
     'packages': [
         "jujuresources",
     ],
+    'install_requires': [
+        'pyaml',
+    ],
     'entry_points': {
         'console_scripts': [
             'juju-resources = jujuresources.cli:resources',
