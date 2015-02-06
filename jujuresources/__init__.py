@@ -68,7 +68,7 @@ def _invalid_resources(resdefs, resources_to_check):
     return invalid
 
 
-def _fetch_resources(resdefs, resources_to_fetch, base_url, force=False, reporthook=None):
+def _fetch_resources(resdefs, resources_to_fetch, mirror_url, force=False, reporthook=None):
     if not resources_to_fetch:
         resources_to_fetch = resdefs['resources'].keys()
     if resources_to_fetch is ALL:
@@ -80,8 +80,8 @@ def _fetch_resources(resdefs, resources_to_fetch, base_url, force=False, reporth
         if name not in invalid and not force:
             continue
         resource = resdefs['all_resources'][name]
-        if base_url:
-            url = urljoin(base_url, resource['filename'])
+        if mirror_url:
+            url = urljoin(mirror_url, resource['filename'])
         else:
             url = resource['url']
         if url.startswith('./'):
@@ -117,7 +117,7 @@ def verify(resources_to_check=None, resources_yaml='resources.yaml'):
 
 
 def fetch(resources_to_fetch=None, resources_yaml='resources.yaml',
-          base_url=None, force=False, reporthook=None):
+          mirror_url=None, force=False, reporthook=None):
     """
     Attempt to fetch all resources for a charm.
 
@@ -128,10 +128,10 @@ def fetch(resources_to_fetch=None, resources_yaml='resources.yaml',
     :param str resources_yaml: Location of the yaml file containing the
         resource descriptions (default: ``./resources.yaml``).
         Can be a local file name or a remote URL.
-    :param str base_url: Override the location to fetch all resources from.
+    :param str mirror_url: Override the location to fetch all resources from.
         If given, only the filename from the resource definitions are used,
         with the rest of the URL being ignored in favor of the given
-        ``base_url``.
+        ``mirror_url``.
     :param force bool: Force re-downloading of valid resources.
     :param func reporthook: Callback for reporting download progress.
         Will be called with the arguments: resource name, current block,
@@ -140,7 +140,7 @@ def fetch(resources_to_fetch=None, resources_yaml='resources.yaml',
         downloaded.
     """
     resdefs = _load_resources(resources_yaml, None)
-    _fetch_resources(resdefs, resources_to_fetch, base_url, force, reporthook)
+    _fetch_resources(resdefs, resources_to_fetch, mirror_url, force, reporthook)
     return not _invalid_resources(resdefs, resources_to_fetch)
 
 

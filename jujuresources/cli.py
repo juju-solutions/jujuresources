@@ -113,7 +113,7 @@ def fetch(opts):
     all_resources = resdefs['all_resources'].keys()
     if not opts.resource_names:
         opts.resource_names = all_resources if opts.all else required_resources
-    _fetch_resources(resdefs, opts.resource_names, opts.base_url,
+    _fetch_resources(resdefs, opts.resource_names, opts.mirror_url,
                      opts.force, reporthook(opts.quiet))
     return verify(opts)
 
