@@ -1,5 +1,6 @@
 from __future__ import print_function
 import os
+import ssl
 import sys
 import socket
 import argparse
@@ -11,6 +12,7 @@ from jujuresources import _fetch
 from jujuresources import _invalid
 from jujuresources import _load
 from jujuresources import ALL
+from jujuresources import backend
 
 
 def arg(*args, **kwargs):
@@ -89,6 +91,8 @@ def resources(argv=sys.argv[1:]):
      help='Suppress output and only set the return code')
 @arg('-f', '--force', action='store_true',
      help='Force re-download of valid resources')
+@arg('-v', '--verbose', action='store_true',
+     help='Write download error information to stderr')
 @arg('resource_names', nargs='*',
      help='Names of specific resources to fetch (defaults to all required, '
           'or all if --all is given)')
@@ -100,6 +104,8 @@ def fetch(opts):
     if opts.all:
         opts.resource_names = ALL
     reporthook = None if opts.quiet else lambda name: print('Fetching {}...'.format(name))
+    if opts.verbose:
+        backend.VERBOSE = True
     _fetch(resources, opts.resource_names, opts.mirror_url, opts.force, reporthook)
     return verify(opts)
 
@@ -153,10 +159,28 @@ def resource_path(opts):
      help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
 @arg('-d', '--output-dir', default=None,
      help='Directory containing the fetched resources (default: ./resources/)')
+@arg('resource_name', help='Name of a resource')
+def resource_spec(opts):
+    """
+    Return the spec (URL, package spec, file, etc) for a named resource.
+    """
+    resources = _load(opts.resources, opts.output_dir)
+    if opts.resource_name not in resources:
+        sys.stderr.write('Invalid resource name: {}\n'.format(opts.resource_name))
+        return 1
+    print(resources[opts.resource_name].spec)
+
+
+@arg('-r', '--resources', default='resources.yaml',
+     help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
+@arg('-d', '--output-dir', default=None,
+     help='Directory containing the fetched resources (default: ./resources/)')
 @arg('-H', '--host', default='',
      help='IP address on which to bind the mirror server')
 @arg('-p', '--port', type=int, default=8080,
      help='Port on which to bind the mirror server')
+@arg('-s', '--ssl-cert', default=None,
+     help='Path to an SSL certificate file (will run without SSL if not given)')
 def serve(opts):
     """
     Run a light-weight HTTP server hosting previously mirrored resources
@@ -166,9 +190,15 @@ def serve(opts):
     if not os.path.exists(opts.output_dir):
         sys.stderr.write("Resources dir '{}' not found.  Did you fetch?\n".format(opts.output_dir))
         return 1
+    backend.PyPIResource.build_pypi_indexes(opts.output_dir)
     os.chdir(opts.output_dir)
+
     SocketServer.TCPServer.allow_reuse_address = True
     httpd = SocketServer.TCPServer((opts.host, opts.port), SimpleHTTPRequestHandler)
 
-    print("Serving at: http://{}:{}/".format(socket.gethostname(), opts.port))
+    if opts.ssl_cert:
+        httpd.socket = ssl.wrap_socket(httpd.socket, certfile=opts.ssl_cert, server_side=True)
+
+    print("Serving at: http{}://{}:{}/".format(
+        's' if opts.ssl_cert else '', socket.gethostname(), opts.port))
     httpd.serve_forever()

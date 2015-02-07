@@ -3,6 +3,7 @@
 import mock
 import os
 import unittest
+import subprocess
 
 from jujuresources import backend
 
@@ -64,16 +65,18 @@ class TestResource(unittest.TestCase):
         self.assertIsInstance(
             backend.Resource.get('name', {'filename': 'foo'}, 'od'),
             backend.Resource)
-        self.assertRaises(NotImplementedError,
-                          backend.Resource.get, 'name', {'pip': 'foo'}, 'od')
+        self.assertIsInstance(
+            backend.Resource.get('name', {'pypi': 'foo'}, 'od'),
+            backend.PyPIResource)
 
     def test_init(self):
         res = backend.Resource('name', {
-            'filename': 'fn',
+            'file': 'path/fn',
             'hash': 'hash',
             'hash_type': 'hash_type',
         }, 'od')
         self.assertEqual(res.name, 'name')
+        self.assertEqual(res.source, 'path/fn')
         self.assertEqual(res.filename, 'fn')
         self.assertEqual(res.destination, 'od/fn')
         self.assertEqual(res.hash, 'hash')
@@ -90,19 +93,19 @@ class TestResource(unittest.TestCase):
 
     def test_init_explicit_destination(self):
         res = backend.Resource('name', {
-            'filename': 'fn',
+            'file': 'fn',
             'destination': 'dst'
         }, 'od')
         self.assertEqual(res.destination, 'dst')
 
     def test_fetch(self):
-        res = backend.Resource('name', {'filename': 'fn'}, 'od')
+        res = backend.Resource('name', {'file': 'fn'}, 'od')
         res.fetch()
         res.fetch('mirror')
 
     def test_verify(self):
         res = backend.Resource('name', {
-            'filename': 'res-defaults.yaml',
+            'file': 'res-defaults.yaml',
             'hash': '4f08575d804517cea2265a7d43022771',
             'hash_type': 'md5',
         }, self.test_data)
@@ -110,7 +113,7 @@ class TestResource(unittest.TestCase):
 
     def test_verify_invalid(self):
         res = backend.Resource('name', {
-            'filename': 'res-defaults.yaml',
+            'file': 'res-defaults.yaml',
             'hash': 'deadbeef',
             'hash_type': 'md5',
         }, self.test_data)
@@ -118,7 +121,7 @@ class TestResource(unittest.TestCase):
 
     def test_verify_missing(self):
         res = backend.Resource('name', {
-            'filename': 'nonce',
+            'file': 'nonce',
             'hash': '4f08575d804517cea2265a7d43022771',
             'hash_type': 'md5',
         }, self.test_data)
@@ -180,6 +183,215 @@ class TestURLResource(unittest.TestCase):
         res.fetch('http://mirror.com/')
         mmakedirs.assert_called_with('od')
         murlretrieve.assert_called_with('http://mirror.com/fn', 'od/fn')
+
+
+class TestPyPIResource(unittest.TestCase):
+    test_data = os.path.join(os.path.dirname(__file__), 'data')
+
+    def test_init(self):
+        res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, 'od')
+        self.assertEqual(res.spec, 'jujuresources>=0.2')
+        self.assertEqual(res.package_name, 'jujuresources')
+        self.assertEqual(res.destination_dir, 'od/jujuresources')
+        self.assertEqual(res.filename, '')
+        self.assertEqual(res.destination, '')
+        self.assertEqual(res.hash, '')
+        self.assertEqual(res.hash_type, '')
+
+    @mock.patch.object(os, 'listdir')
+    @mock.patch.object(backend, 'subprocess')
+    @mock.patch.object(os, 'makedirs')
+    @mock.patch.object(os.path, 'exists')
+    def test_fetch(self, mexists, mmakedirs, msubprocess, mlistdir):
+        mexists.return_value = False
+        res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, 'od')
+        res.get_remote_hash = mock.Mock()
+        res._write_file = mock.Mock()
+        res.process_dependency = mock.Mock()
+        mlistdir.return_value = ['pyaml-3.0.tgz', 'jujuresources-0.2.tgz']
+        res.get_remote_hash.return_value = ('hash_type', 'hash')
+        res.fetch()
+        mmakedirs.assert_called_with(res.destination_dir)
+        msubprocess.check_output.assert_called_once_with(
+            ['pip', 'install', 'jujuresources>=0.2',
+                '--download', 'od/jujuresources'],
+            stderr=msubprocess.STDOUT)
+        res.get_remote_hash.assert_called_once_with(
+            'jujuresources-0.2.tgz', 'https://pypi.python.org/simple/')
+        res._write_file.assert_called_once_with(
+            'od/jujuresources/jujuresources-0.2.tgz.hash_type', 'hash\n')
+        self.assertEqual(res.filename, 'jujuresources-0.2.tgz')
+        self.assertEqual(res.destination, 'od/jujuresources/jujuresources-0.2.tgz')
+        self.assertEqual(res.hash, 'hash')
+        self.assertEqual(res.hash_type, 'hash_type')
+        res.process_dependency.assert_called_once_with(
+            'pyaml-3.0.tgz', 'https://pypi.python.org/simple/')
+
+    @mock.patch.object(os, 'listdir')
+    @mock.patch.object(backend, 'subprocess')
+    @mock.patch.object(os, 'makedirs')
+    @mock.patch.object(os.path, 'exists')
+    def test_fetch_mirror(self, mexists, mmakedirs, msubprocess, mlistdir):
+        mexists.return_value = True
+        res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, 'od')
+        res.get_remote_hash = mock.Mock()
+        res._write_file = mock.Mock()
+        res.process_dependency = mock.Mock()
+        mlistdir.return_value = ['pyaml-3.0.tgz', 'jujuresources-0.2.tgz']
+        res.get_remote_hash.return_value = ('hash_type', 'hash')
+        res.fetch('mirror')
+        assert not mmakedirs.called
+        msubprocess.check_output.assert_called_once_with(
+            ['pip', 'install', 'jujuresources>=0.2',
+                '--download', 'od/jujuresources',
+                '-i', 'mirror'],
+            stderr=msubprocess.STDOUT)
+        res.get_remote_hash.assert_called_once_with(
+            'jujuresources-0.2.tgz', 'mirror/')
+        res._write_file.assert_called_once_with(
+            'od/jujuresources/jujuresources-0.2.tgz.hash_type', 'hash\n')
+        self.assertEqual(res.filename, 'jujuresources-0.2.tgz')
+        self.assertEqual(res.destination, 'od/jujuresources/jujuresources-0.2.tgz')
+        self.assertEqual(res.hash, 'hash')
+        self.assertEqual(res.hash_type, 'hash_type')
+        res.process_dependency.assert_called_once_with('pyaml-3.0.tgz', 'mirror/')
+
+    @mock.patch.object(subprocess, 'check_output')
+    @mock.patch.object(os, 'makedirs')
+    @mock.patch.object(os.path, 'isdir')
+    def test_fetch_fail(self, misdir, mmakedirs, mcheck_output):
+        misdir.return_value = True
+        res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, 'od')
+        res.get_remote_hash = mock.Mock()
+        mcheck_output.side_effect = subprocess.CalledProcessError(
+            1, ['cmd'],
+        )
+        res.fetch()
+        mcheck_output.assert_called_once_with(
+            ['pip', 'install', 'jujuresources>=0.2',
+                '--download', 'od/jujuresources'],
+            stderr=subprocess.STDOUT)
+        assert not res.get_remote_hash.called
+
+    def test_verify(self):
+        res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, self.test_data)
+        res.filename = 'res-defaults.yaml'
+        res.destination = os.path.join(self.test_data, res.filename)
+        res.hash = '4f08575d804517cea2265a7d43022771'
+        res.hash_type = 'md5'
+        res.get_local_hash = mock.Mock()
+        assert res.verify()
+        assert res.get_local_hash.called
+
+    def test_get_local_hash(self):
+        res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, self.test_data)
+        res.filename = 'jujuresources-0.2.tar.gz'
+        res.get_local_hash()
+        self.assertEqual(res.hash, '4f08575d804517cea2265a7d43022771')
+        self.assertEqual(res.hash_type, 'md5')
+
+    @mock.patch('os.listdir')
+    def test_get_local_hash_missing(self, mlistdir):
+        res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, self.test_data)
+        res.filename = 'jujuresources-0.2.tar.gz'
+        mlistdir.return_value = ['jujuresources-0.2.tar.gz.md5']
+        res.get_local_hash()
+        self.assertEqual(res.hash, '')
+        self.assertEqual(res.hash_type, '')
+
+    @mock.patch.object(backend, 'urlopen')
+    def test_get_remote_hash(self, murlopen):
+        res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.1'}, 'od')
+        murlopen.return_value.read.return_value = (
+            '<html>'
+            '<a href="../../packages/source/j/jujuresources/'
+            'jujuresources-0.1.tar.gz#md5=4fdc461dcde13b1e919c17bac6e01464">'
+            'jujuresources-0.1.tar.gz'
+            '</a>'
+            '<a href="../../packages/source/j/jujuresources/'
+            'jujuresources-0.2.tar.gz#md5=deadbeef">'
+            'jujuresources-0.2.tar.gz'
+            '</a>'
+            '</html>')
+        hash_type, hash = res.get_remote_hash('jujuresources-0.2.tar.gz', 'mirror')
+        self.assertEqual(hash, 'deadbeef')
+        self.assertEqual(hash_type, 'md5')
+
+    @mock.patch.object(backend, 'urlopen')
+    def test_get_remote_hash_no_match(self, murlopen):
+        res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, 'od')
+        murlopen.return_value.read.return_value = (
+            '<html>'
+            '<a href="../../packages/source/j/jujuresources/'
+            'jujuresources-0.1.tar.gz#md5=4fdc461dcde13b1e919c17bac6e01464">'
+            'jujuresources-0.1.tar.gz'
+            '</a>'
+            '</html>')
+        hash_type, hash = res.get_remote_hash('jujuresources-0.2.tar.gz', 'mirror')
+        self.assertEqual(hash, '')
+        self.assertEqual(hash_type, '')
+
+    @mock.patch.object(backend.PyPIResource, '_get_index')
+    def test_package_name_from_filename(self, mget_index):
+        mget_index.return_value = set(['foo', 'bar', 'qux-zod', 'foo-bar'])
+        cases = {
+            'qux-1.0.zip': '',
+            'foo-1.0.tar.gz': 'foo',
+            'bar-1.0-x86_64.tar.gz': 'bar',
+            'qux-zod-1.0dev-py2.4.egg': 'qux-zod',
+            'foo-bar-1.0.tar.gz': 'foo-bar',
+        }
+        for input, expected in cases.items():
+            actual = backend.PyPIResource._package_name_from_filename(input, 'mirror')
+            self.assertEqual(expected, actual)
+        mget_index.assert_called_with('mirror')
+
+    @mock.patch.object(os, 'rename')
+    @mock.patch.object(os, 'makedirs')
+    @mock.patch.object(os.path, 'exists')
+    def test_process_dependency(self, mexists, mmakedirs, mrename):
+        mexists.return_value = False
+        res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, 'od')
+        res._package_name_from_filename = mock.Mock(return_value='new-package')
+        res.get_remote_hash = mock.Mock(return_value=('hash_type', 'hash'))
+        res._write_file = mock.Mock()
+        res.process_dependency('new-package-1.0-python2.7.egg', 'mirror')
+        mexists.assert_called_with('od/new-package')
+        mmakedirs.assert_called_with('od/new-package')
+        mrename.assert_called_with(
+            'od/jujuresources/new-package-1.0-python2.7.egg',
+            'od/new-package/new-package-1.0-python2.7.egg')
+        res.get_remote_hash.assert_called_with('new-package-1.0-python2.7.egg', 'mirror')
+        res._write_file.assert_called_with(
+            'od/new-package/new-package-1.0-python2.7.egg.hash_type',
+            'hash\n')
+
+    @mock.patch.object(backend, 'urlopen')
+    def test_get_index(self, murlopen):
+        murlopen.return_value.read.return_value = (
+            '<html>'
+            '<a href="foo">Foo</a>'
+            '<a href="bar">bar</a>'
+            '<a href="baz-0">baz-0</a>'
+            '</html>'
+        )
+        backend.PyPIResource._index = None
+        result = backend.PyPIResource._get_index('url')
+        self.assertItemsEqual(result, ['Foo', 'bar', 'baz-0'])
+        self.assertIs(backend.PyPIResource._index, result)
+
+    def test_get_index_cached(self):
+        backend.PyPIResource._index = 'foo'
+        self.assertEqual(backend.PyPIResource._get_index('url'), 'foo')
+
+    @mock.patch.object(backend.PyPIResource, '_write_file')
+    def test_build_pypi_indexes(self, mwrite_file):
+        backend.PyPIResource.build_pypi_indexes(self.test_data)
+        self.assertEqual(mwrite_file.call_count, 1)
+        self.assertEqual(mwrite_file.call_args_list[0][0][0],
+                         os.path.join(self.test_data, 'jujuresources', 'index.html'))
+        self.assertIn('href="jujuresources-0.2.tar.gz#md5=4f08575d804517cea2265a7d43022771"',
+                      mwrite_file.call_args_list[0][0][1])
 
 
 if __name__ == '__main__':

@@ -143,27 +143,31 @@ class TestCLI(unittest.TestCase):
     @mock.patch('jujuresources.cli._exit')
     @mock.patch('jujuresources.cli.print')
     @mock.patch('jujuresources.cli.SocketServer')
+    @mock.patch('jujuresources.cli.backend')
     @mock.patch('jujuresources.cli.os')
     @mock.patch('jujuresources.cli._load')
-    def test_serve(self, mload, mos, mSocketServer, mprint, mexit):
+    def test_serve(self, mload, mos, mbackend, mSocketServer, mprint, mexit):
         mload.return_value = self.resources
         mos.path.exists.return_value = True
         jujuresources.cli.resources(['serve', '-H', 'host', '-p', '9999'])
         mos.chdir.assert_called_once_with('resources')
+        mbackend.PyPIResource.build_pypi_indexes.assert_called_with('resources')
         self.assertIs(mSocketServer.TCPServer.allow_reuse_address, True)
         mSocketServer.TCPServer.assert_called_once_with(('host', 9999), jujuresources.cli.SimpleHTTPRequestHandler)
 
     @mock.patch('jujuresources.cli._exit')
     @mock.patch('jujuresources.cli.print')
     @mock.patch('jujuresources.cli.SocketServer')
+    @mock.patch('jujuresources.cli.backend')
     @mock.patch('jujuresources.cli.os')
     @mock.patch('jujuresources.cli._load')
-    def test_serve_dir(self, mload, mos, mSocketServer, mprint, mexit):
+    def test_serve_dir(self, mload, mos, mbackend, mSocketServer, mprint, mexit):
         mload.return_value = ResourceContainer('od')
         mos.path.exists.return_value = True
         jujuresources.cli.resources(['serve', '-d', 'od'])
         mload.assert_called_once_with('resources.yaml', 'od')
         mos.path.exists.assert_called_once_with('od')
+        mbackend.PyPIResource.build_pypi_indexes.assert_called_with('resources')
         mos.chdir.assert_called_once_with('od')
         self.assertIs(mSocketServer.TCPServer.allow_reuse_address, True)
         mSocketServer.TCPServer.assert_called_once_with(('', 8080), jujuresources.cli.SimpleHTTPRequestHandler)

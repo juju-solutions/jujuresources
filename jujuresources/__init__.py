@@ -5,10 +5,12 @@ from urllib import urlopen
 import yaml
 
 from jujuresources.backend import ResourceContainer
+from jujuresources.backend import PyPIResource
 from jujuresources.backend import ALL
 
 
-__all__ = ['fetch', 'verify', 'resource_path', 'config_get', 'ALL']
+__all__ = ['fetch', 'verify', 'resource_path', 'resource_spec', 'ALL',
+           'config_get', 'pip_install_resources']
 resources_cache = {}
 
 
@@ -21,6 +23,36 @@ def config_get(option_name):
         return yaml.load(raw.decode('UTF-8'))
     except ValueError:
         return None
+
+
+def pip_install_resources(which, mirror_url=None, resources_yaml='resources.yaml'):
+    """
+    Install a PyPI resource.
+
+    If the resource has been previously :func:`fetched <fetch>`, then that
+    copy will be used.  Otherwise, it will be installed directly from the
+    mirror or PyPI.
+
+    This is equivalent to calling the following for each resource name in `which`::
+
+        pip install `juju-resources resource_spec $resource` -i $mirror_url
+
+    :param list which: A list of one or more resource names to
+        check.  If ommitted, all non-optional resources are verified.
+        You can also pass ``jujuresources.ALL`` to fetch all optional and
+        required resources.
+    :param str resources_yaml: Location of the yaml file containing the
+        resource descriptions (default: ``resources.yaml``).
+        Can be a local file name or a remote URL.
+    """
+    resources = _load(resources_yaml, None)
+    for resource in resources.subset(which):
+        if not isinstance(resource, PyPIResource):
+            raise ValueError('Not a PyPI resource: {}'.format(resource.name))
+        cmd = ['pip', 'install', resource.spec]
+        if mirror_url:
+            cmd.extend(['-i', mirror_url])
+        subprocess.check_call(cmd)
 
 
 def _load(resources_yaml, output_dir=None):
@@ -93,8 +125,8 @@ def verify(which=None, resources_yaml='resources.yaml'):
     return not _invalid(resources, which)
 
 
-def fetch(which=None, resources_yaml='resources.yaml',
-          mirror_url=None, force=False, reporthook=None):
+def fetch(which=None, mirror_url=None, resources_yaml='resources.yaml',
+          force=False, reporthook=None):
     """
     Attempt to fetch all resources for a charm.
 
@@ -102,13 +134,13 @@ def fetch(which=None, resources_yaml='resources.yaml',
         fetch.  If ommitted, all non-optional resources are fetched.
         You can also pass ``jujuresources.ALL`` to fetch all optional *and*
         required resources.
-    :param str resources_yaml: Location of the yaml file containing the
-        resource descriptions (default: ``./resources.yaml``).
-        Can be a local file name or a remote URL.
     :param str mirror_url: Override the location to fetch all resources from.
         If given, only the filename from the resource definitions are used,
         with the rest of the URL being ignored in favor of the given
         ``mirror_url``.
+    :param str resources_yaml: Location of the yaml file containing the
+        resource descriptions (default: ``./resources.yaml``).
+        Can be a local file name or a remote URL.
     :param force bool: Force re-downloading of valid resources.
     :param func reporthook: Callback for reporting download progress.
         Will be called once for each resource, just prior to fetching, and will
@@ -123,7 +155,14 @@ def fetch(which=None, resources_yaml='resources.yaml',
 
 def resource_path(resource_name, resources_yaml='resources.yaml'):
     """
-    Get the destination path for a named resource.
+    Get the local path for a named resource that has been fetched.
+
+    This may return ``None`` if the local path cannot be determined
+    (for example, if the resource has not been fetched yet and needs
+    to be resolved).  Even if it returns a path, that path is not
+    guaranteed to exist or be valid; you should always confirm that
+    a resource is available using :func:`verify` or :func:`fetch`
+    before using it.
 
     :param str resource_name: The name of a resource to resolve.
     :param str resources_yaml: Location of the yaml file containing the
@@ -132,3 +171,18 @@ def resource_path(resource_name, resources_yaml='resources.yaml'):
     """
     resources = _load(resources_yaml, None)
     return resources[resource_name].destination
+
+
+def resource_spec(resource_name, resources_yaml='resources.yaml'):
+    """
+    Get the spec for a named resource.  This would be the URL for URL
+    resources, the Python package spec for PyPI resources, the full
+    path for local file resources, etc.
+
+    :param str resource_name: The name of a resource to resolve.
+    :param str resources_yaml: Location of the yaml file containing the
+        resource descriptions (default: ``./resources.yaml``).
+        Can be a local file name or a remote URL.
+    """
+    resources = _load(resources_yaml, None)
+    return resources[resource_name].spec
