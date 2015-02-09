@@ -9,8 +9,8 @@ from jujuresources.backend import PyPIResource
 from jujuresources.backend import ALL
 
 
-__all__ = ['fetch', 'verify', 'resource_path', 'resource_spec', 'ALL',
-           'config_get', 'pip_install_resources']
+__all__ = ['fetch', 'verify', 'install', 'resource_path', 'resource_spec',
+           'ALL', 'config_get']
 resources_cache = {}
 
 
@@ -23,36 +23,6 @@ def config_get(option_name):
         return yaml.load(raw.decode('UTF-8'))
     except ValueError:
         return None
-
-
-def pip_install_resources(which, mirror_url=None, resources_yaml='resources.yaml'):
-    """
-    Install a PyPI resource.
-
-    If the resource has been previously :func:`fetched <fetch>`, then that
-    copy will be used.  Otherwise, it will be installed directly from the
-    mirror or PyPI.
-
-    This is equivalent to calling the following for each resource name in `which`::
-
-        pip install `juju-resources resource_spec $resource` -i $mirror_url
-
-    :param list which: A list of one or more resource names to
-        check.  If ommitted, all non-optional resources are verified.
-        You can also pass ``jujuresources.ALL`` to fetch all optional and
-        required resources.
-    :param str resources_yaml: Location of the yaml file containing the
-        resource descriptions (default: ``resources.yaml``).
-        Can be a local file name or a remote URL.
-    """
-    resources = _load(resources_yaml, None)
-    for resource in resources.subset(which):
-        if not isinstance(resource, PyPIResource):
-            raise ValueError('Not a PyPI resource: {}'.format(resource.name))
-        cmd = ['pip', 'install', resource.spec]
-        if mirror_url:
-            cmd.extend(['-i', mirror_url])
-        subprocess.check_call(cmd)
 
 
 def _load(resources_yaml, output_dir=None):
@@ -85,6 +55,20 @@ def _fetch(resources, which, mirror_url, force=False, reporthook=None):
         if reporthook:
             reporthook(resource.name)
         resource.fetch(mirror_url)
+
+
+def _install(resources, which, mirror_url, destination, skip_top_level):
+    success = True
+    pypi_resources = []
+    for resource in resources.subset(which):
+        if isinstance(resource, PyPIResource):
+            # group pypi resources to reduce subprocess calls
+            pypi_resources.append(resource)
+        elif destination is not None:
+            success = resource.install(destination, skip_top_level) and success
+    if pypi_resources:
+        success = PyPIResource.install_group(pypi_resources, mirror_url) and success
+    return success
 
 
 def invalid(which=None, resources_yaml='resources.yaml'):
@@ -134,10 +118,7 @@ def fetch(which=None, mirror_url=None, resources_yaml='resources.yaml',
         fetch.  If ommitted, all non-optional resources are fetched.
         You can also pass ``jujuresources.ALL`` to fetch all optional *and*
         required resources.
-    :param str mirror_url: Override the location to fetch all resources from.
-        If given, only the filename from the resource definitions are used,
-        with the rest of the URL being ignored in favor of the given
-        ``mirror_url``.
+    :param str mirror_url: Fetch resources from the given mirror.
     :param str resources_yaml: Location of the yaml file containing the
         resource descriptions (default: ``./resources.yaml``).
         Can be a local file name or a remote URL.
@@ -186,3 +167,35 @@ def resource_spec(resource_name, resources_yaml='resources.yaml'):
     """
     resources = _load(resources_yaml, None)
     return resources[resource_name].spec
+
+
+def install(which=None, mirror_url=None, destination=None, skip_top_level=False,
+            resources_yaml='resources.yaml'):
+    """
+    Install one or more resources.
+
+    The resource(s) will be fetched, if necessary, and different resource
+    types are handled appropriately (e.g., PyPI resources are installed
+    with ``pip``, archive file resources are extracted, non-archive file
+    resources are copied, etc).
+
+    For PyPI resources, this is roughly equivalent to the following::
+
+        pip install `juju-resources resource_spec $resource` -i $mirror_url
+
+    :param list which: A name, or a list of one or more resource names, to
+        fetch.  If ommitted, all non-optional resources are installed.
+    :param str mirror_url: Fetch resources from the given mirror.
+    :param str destination: Destination to which to extract or copy file resources.
+    :param bool skip_top_level: When extracting archive file resources, skip
+        all members that are at the top level of the archive and instead extract
+        all nested members directly into ``destination``.  E.g., an archive
+        containing ``foo/bar.txt`` and ``foo/qux/baz.txt`` will be extracted as
+        ``destination/bar.txt`` and ``destination/qux/baz.txt``.
+    :param str resources_yaml: Location of the yaml file containing the
+        resource descriptions (default: ``resources.yaml``).
+        Can be a local file name or a remote URL.
+    :returns: True if all resources were successfully installed.
+    """
+    resources = _load(resources_yaml, None)
+    return _install(resources, mirror_url, destination, skip_top_level)

@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import mock
 import os
 import unittest
@@ -19,12 +17,18 @@ class TestAPI(unittest.TestCase):
             'hash': '4f08575d804517cea2265a7d43022771',
             'hash_type': 'md5',
         })
+        self.resources.add_required('py-valid', {
+            'pypi': 'py-valid',
+        })
         self.resources.add_required('invalid', {
             'url': 'invalid',
             'filename': 'invalid',
             'destination': 'res-defaults.yaml',
             'hash': 'deadbeef',
             'hash_type': 'md5',
+        })
+        self.resources.add_required('py-invalid', {
+            'pypi': 'py-invalid',
         })
         self.resources.add_optional('opt-invalid', {
             'url': 'opt-invalid',
@@ -36,6 +40,7 @@ class TestAPI(unittest.TestCase):
         for resource in self.resources.all():
             resource.fetch = mock.Mock()
             resource.verify = mock.Mock(return_value='invalid' not in resource.name)
+            resource.install = mock.Mock(return_value='invalid' not in resource.name)
 
     def test_load_defaults(self):
         resources = jujuresources._load(os.path.join(self.test_data, 'res-defaults.yaml'))
@@ -71,8 +76,8 @@ class TestAPI(unittest.TestCase):
         self.assertItemsEqual(jujuresources._invalid(self.resources, 'valid'), [])
         self.assertItemsEqual(jujuresources._invalid(self.resources, 'invalid'), ['invalid'])
         self.assertItemsEqual(jujuresources._invalid(self.resources, 'opt-invalid'), ['opt-invalid'])
-        self.assertItemsEqual(jujuresources._invalid(self.resources, None), ['invalid'])
-        self.assertItemsEqual(jujuresources._invalid(self.resources, []), ['invalid'])
+        self.assertItemsEqual(jujuresources._invalid(self.resources, None), ['invalid', 'py-invalid'])
+        self.assertItemsEqual(jujuresources._invalid(self.resources, []), ['invalid', 'py-invalid'])
 
     @mock.patch('jujuresources._invalid')
     def test_fetch(self, minvalid):
@@ -108,6 +113,25 @@ class TestAPI(unittest.TestCase):
     def test_resource_path(self, mload):
         mload.return_value = self.resources
         self.assertEqual(jujuresources.resource_path('valid'), 'res-defaults.yaml')
+
+    @mock.patch('jujuresources.backend.PyPIResource.install_group')
+    def test_install(self, minstall_group):
+        minstall_group.return_value = False
+        success = jujuresources._install(self.resources, None, 'mirror', 'dest', True)
+        assert not success
+        self.resources['valid'].install.assert_called_with('dest', True)
+        assert not self.resources['py-valid'].install.called
+        self.resources['invalid'].install.assert_called_with('dest', True)
+        assert not self.resources['py-invalid'].install.called
+        assert not self.resources['opt-invalid'].install.called
+        minstall_group.assert_called_with(mock.ANY, 'mirror')
+        self.assertItemsEqual(
+            minstall_group.call_args_list[0][0][0],
+            [self.resources['py-valid'], self.resources['py-invalid']])
+        assert jujuresources._install(self.resources, 'valid', 'mirror', 'dest', True)
+        assert not jujuresources._install(self.resources, ['valid', 'py-invalid'], 'mirror', 'dest', True)
+        minstall_group.return_value = True
+        assert jujuresources._install(self.resources, ['valid', 'py-valid'], 'mirror', 'dest', True)
 
 
 if __name__ == '__main__':

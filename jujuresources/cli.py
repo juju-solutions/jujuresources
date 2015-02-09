@@ -9,6 +9,7 @@ from SimpleHTTPServer import SimpleHTTPRequestHandler
 import SocketServer
 
 from jujuresources import _fetch
+from jujuresources import _install
 from jujuresources import _invalid
 from jujuresources import _load
 from jujuresources import ALL
@@ -98,7 +99,7 @@ def resources(argv=sys.argv[1:]):
           'or all if --all is given)')
 def fetch(opts):
     """
-    Create a local mirror of all resources (mandatory and optional) for a charm
+    Create a local mirror of one or more resources.
     """
     resources = _load(opts.resources, opts.output_dir)
     if opts.all:
@@ -123,7 +124,7 @@ def fetch(opts):
           'or all if --all is given)')
 def verify(opts):
     """
-    Create a local mirror of all resources (mandatory and optional) for a charm
+    Verify that one or more resources were downloaded successfully.
     """
     resources = _load(opts.resources, opts.output_dir)
     if opts.all:
@@ -136,6 +137,43 @@ def verify(opts):
     else:
         if not opts.quiet:
             print("Invalid or missing resources: {}".format(', '.join(invalid)))
+        return 1
+
+
+@arg('-r', '--resources', default='resources.yaml',
+     help='File or URL containing the YAML resource descriptions (default: ./resources.yaml)')
+@arg('-d', '--output-dir', default=None,
+     help='Directory containing the fetched resources (default: ./resources/)')
+@arg('-u', '--mirror-url',
+     help='URL at which the resources are mirrored')
+@arg('-a', '--all', action='store_true',
+     help='Include all optional resources as well as required')
+@arg('-q', '--quiet', action='store_true',
+     help='Suppress output and only set the return code')
+@arg('-D', '--destination',
+     help='Destination for archive or file resources to be installed to')
+@arg('-s', '--skip-top-level', action='store_true',
+     help='Skip top-level members of archives, and extract children directly to destination')
+@arg('resource_names', nargs='*',
+     help='Names of specific resources to verify (defaults to all required, '
+          'or all if --all is given)')
+def install(opts):
+    """
+    Install one or more resources.
+    """
+    resources = _load(opts.resources, opts.output_dir)
+    if opts.all:
+        opts.resource_names = ALL
+    success = _install(resources, opts.resource_names, opts.mirror_url,
+                       opts.destination, opts.skip_top_level)
+    if success:
+        if not opts.quiet:
+            print("All resources successfully installed")
+        return 0
+    else:
+        if not opts.quiet:
+            invalid = _invalid(resources, opts.resource_names)
+            print("Unable to install some resources: {}".format(', '.join(invalid)))
         return 1
 
 

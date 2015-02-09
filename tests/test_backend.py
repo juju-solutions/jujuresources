@@ -3,7 +3,9 @@
 import mock
 import os
 import unittest
+import shutil
 import subprocess
+from tempfile import mkdtemp
 
 from jujuresources import backend
 
@@ -126,6 +128,89 @@ class TestResource(unittest.TestCase):
             'hash_type': 'md5',
         }, self.test_data)
         assert not res.verify()
+
+    def test_install_invalid(self):
+        res = backend.Resource('name', {
+            'file': 'res-defaults.yaml',
+            'hash': 'deadbeef',
+            'hash_type': 'md5',
+        }, self.test_data)
+        tmpdir = mkdtemp()
+        try:
+            assert not res.install(tmpdir)
+            self.assertEqual(os.listdir(tmpdir), [])
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_install_tgz(self):
+        res = backend.Resource('name', {
+            'file': 'test.tgz',
+            'hash': '347153cce7f15a6d3e47d34fbccb6afa',
+            'hash_type': 'md5',
+        }, self.test_data)
+        tmpdir = mkdtemp()
+        try:
+            assert res.install(tmpdir)
+            self.assertItemsEqual(os.listdir(tmpdir), ['toplevel'])
+            self.assertItemsEqual(os.listdir(os.path.join(tmpdir, 'toplevel')), ['foo', 'bar'])
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_install_tgz_skip_top_level(self):
+        res = backend.Resource('name', {
+            'file': 'test.tgz',
+            'hash': '347153cce7f15a6d3e47d34fbccb6afa',
+            'hash_type': 'md5',
+        }, self.test_data)
+        tmpdir = mkdtemp()
+        os.rmdir(tmpdir)
+        try:
+            assert res.install(tmpdir, skip_top_level=True)
+            self.assertItemsEqual(os.listdir(tmpdir), ['foo', 'bar'])
+            self.assertItemsEqual(os.listdir(os.path.join(tmpdir, 'bar')), ['qux'])
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_install_zip(self):
+        res = backend.Resource('name', {
+            'file': 'test.zip',
+            'hash': '5c7b6a3c4bf38ac9d2f0ab0088fff1a9',
+            'hash_type': 'md5',
+        }, self.test_data)
+        tmpdir = mkdtemp()
+        try:
+            assert res.install(tmpdir)
+            self.assertItemsEqual(os.listdir(tmpdir), ['toplevel'])
+            self.assertItemsEqual(os.listdir(os.path.join(tmpdir, 'toplevel')), ['foo', 'bar'])
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_install_zip_skip_top_level(self):
+        res = backend.Resource('name', {
+            'file': 'test.zip',
+            'hash': '5c7b6a3c4bf38ac9d2f0ab0088fff1a9',
+            'hash_type': 'md5',
+        }, self.test_data)
+        tmpdir = mkdtemp()
+        try:
+            assert res.install(tmpdir, skip_top_level=True)
+            self.assertItemsEqual(os.listdir(tmpdir), ['foo', 'bar'])
+            self.assertItemsEqual(os.listdir(os.path.join(tmpdir, 'bar')), ['qux'])
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_install_file(self):
+        res = backend.Resource('name', {
+            'file': 'res-defaults.yaml',
+            'hash': '4f08575d804517cea2265a7d43022771',
+            'hash_type': 'md5',
+        }, self.test_data)
+        tmpdir = mkdtemp()
+        try:
+            assert res.install(tmpdir)
+            self.assertEqual(os.listdir(tmpdir), ['res-defaults.yaml'])
+        finally:
+            shutil.rmtree(tmpdir)
 
 
 class TestURLResource(unittest.TestCase):
@@ -392,6 +477,34 @@ class TestPyPIResource(unittest.TestCase):
                          os.path.join(self.test_data, 'jujuresources', 'index.html'))
         self.assertIn('href="jujuresources-0.2.tar.gz#md5=4f08575d804517cea2265a7d43022771"',
                       mwrite_file.call_args_list[0][0][1])
+
+    @mock.patch.object(subprocess, 'call')
+    def test_install(self, mcall):
+        mcall.return_value = 0
+        res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.1'}, 'od')
+        res.destination = 'od/foo'
+        res.verify = mock.Mock(return_value=False)
+        assert not res.install()
+        assert not mcall.called
+        res.verify.return_value = True
+        assert res.install()
+        mcall.assert_called_with(['pip', 'install', 'od/foo'])
+        mcall.return_value = 1
+        assert not res.install()
+
+    @mock.patch.object(subprocess, 'call')
+    def test_install_group(self, mcall):
+        resources = [
+            backend.PyPIResource('name', {'pypi': 'foo>=0.1'}, 'od'),
+            backend.PyPIResource('name', {'pypi': 'bar>=0.1'}, 'od'),
+        ]
+        resources[0].verify = mock.Mock(return_value=False)
+        resources[1].verify = mock.Mock(return_value=True)
+        resources[1].destination = 'od/bar'
+        backend.PyPIResource.install_group(resources)
+        mcall.assert_called_with(['pip', 'install', 'foo>=0.1', 'od/bar'])
+        backend.PyPIResource.install_group(resources, mirror_url='mirror')
+        mcall.assert_called_with(['pip', 'install', 'foo>=0.1', 'od/bar', '-i', 'mirror'])
 
 
 if __name__ == '__main__':

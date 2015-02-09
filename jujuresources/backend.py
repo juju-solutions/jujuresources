@@ -2,16 +2,22 @@ from contextlib import closing
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tarfile
 from urllib import urlretrieve, urlopen
 from urlparse import urlparse, urljoin
+import zipfile
 
 
 VERBOSE = False
 
 
 class ALL(object):
+    """
+    Placeholder to select all resources, optional as well as required.
+    """
     pass
 
 
@@ -86,6 +92,42 @@ class Resource(object):
             hash.update(fp.read())
             if self.hash != hash.hexdigest():
                 return False
+        return True
+
+    def install(self, destination, skip_top_level=False):
+        if not self.verify():
+            return False
+
+        def filter_members(af):
+            members = af.infolist() if hasattr(af, 'infolist') else af
+            for member in members:
+                if not skip_top_level:
+                    yield member
+                    continue
+                if hasattr(member, 'path'):
+                    path = member.path  # tarfiles
+                elif hasattr(member, 'filename'):
+                    path = member.filename  # zipfiles
+                if re.match(r'^[^/]+/?$', path):
+                    continue  # skip top-level members
+                path = re.sub(r'^[^/]+/', '', path)  # strip top-level container
+                if hasattr(member, 'path'):
+                    member.path = path  # tarfiles
+                elif hasattr(member, 'filename'):
+                    member.filename = path  # zipfiles
+                yield member
+
+        if not os.path.exists(destination):
+            os.makedirs(destination)
+
+        if tarfile.is_tarfile(self.destination):
+            with tarfile.open(self.destination) as tf:
+                tf.extractall(destination, members=filter_members(tf))
+        elif zipfile.is_zipfile(self.destination):
+            with zipfile.ZipFile(self.destination, 'r') as zf:
+                zf.extractall(destination, members=filter_members(zf))
+        else:
+            shutil.copy2(self.destination, destination)
         return True
 
 
@@ -263,3 +305,23 @@ class PyPIResource(Resource):
                 '  </body>',
                 '</html>',
             ]))
+
+    def install(self):
+        if not self.verify():
+            return False
+        return subprocess.call(['pip', 'install', self.destination]) == 0
+
+    @classmethod
+    def install_group(cls, resources, mirror_url=None):
+        to_install = []
+        for resource in resources:
+            if resource.verify():
+                # use pre-fetched copy, if available
+                to_install.append(resource.destination)
+            else:
+                # otherwise, try installing directly from mirror
+                to_install.append(resource.spec)
+        cmd = ['pip', 'install'] + to_install
+        if mirror_url:
+            cmd.extend(['-i', mirror_url])
+        return subprocess.call(cmd) == 0

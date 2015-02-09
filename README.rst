@@ -25,6 +25,8 @@ such as::
             url: http://example.com/path/to/my_resource.tgz
             hash: b377b7cccdd281bc5e4c4071f80e84a3
             hash_type: sha256
+        my_py:
+            pypi: jujuresources>=0.2
     optional_resources:
         my_optional_resource:
             url: http://example.com/path/to/my_optional_resource.tgz
@@ -34,15 +36,16 @@ such as::
 Then, once the charm has installed Juju Resources, it can fetch
 and verify resources, either in Python::
 
-    from jujuresources import fetch, verify, config_get
+    from jujuresources import fetch, verify, install, config_get
 
     if not fetch(mirror_url=config_get('resources_mirror')):
         print "Mandatory resources did not download; check resources_mirror option"
         sys.exit(1)
+    install('my_py')
 
     fetch('my_optional_resource', mirror_url=config_get('resources_mirror'))
     if verify('my_optional_resource'):
-        install_tgz(resource_path('my_optional_resource'))
+        install('my_optional_resource', destination='/usr/lib/myres', skip_top_level=True)
 
 Or via the command-line / bash::
 
@@ -50,10 +53,11 @@ Or via the command-line / bash::
         echo "Mandatory resources did not download; check resources_mirror option"
         exit 1
     fi
+    juju-resources install my_py
 
     juju-resources fetch -u `config-get resources_mirror` my_optional_resource
     if juju-resources verify my_optional_resource; then
-        actions/install_tgz `juju-resources resource_path my_optional_resource`
+        juju-resources install my_optional_resource -D /usr/lib/myres -s
     fi
 
 

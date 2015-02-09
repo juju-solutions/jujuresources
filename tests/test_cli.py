@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import mock
 import unittest
 
@@ -32,6 +30,25 @@ class TestCLI(unittest.TestCase):
             'hash': 'deadbeef',
             'hash_type': 'md5',
         })
+
+        def mep(name, target):
+            m = mock.Mock()
+            m.name = name
+            m.load.return_value = target
+            return m
+        self._piep = mock.patch.object(jujuresources.cli, 'iter_entry_points')
+        self._miep = self._piep.start()
+        self._miep.return_value = [
+            mep('fetch', jujuresources.cli.fetch),
+            mep('verify', jujuresources.cli.verify),
+            mep('install', jujuresources.cli.install),
+            mep('resource_path', jujuresources.cli.resource_path),
+            mep('resource_spec', jujuresources.cli.resource_spec),
+            mep('serve', jujuresources.cli.serve),
+        ]
+
+    def tearDown(self):
+        self._piep.stop()
 
     @mock.patch('argparse.ArgumentParser._print_message')
     def test_resources_help(self, mprint_help):
@@ -167,7 +184,7 @@ class TestCLI(unittest.TestCase):
         jujuresources.cli.resources(['serve', '-d', 'od'])
         mload.assert_called_once_with('resources.yaml', 'od')
         mos.path.exists.assert_called_once_with('od')
-        mbackend.PyPIResource.build_pypi_indexes.assert_called_with('resources')
+        mbackend.PyPIResource.build_pypi_indexes.assert_called_with('od')
         mos.chdir.assert_called_once_with('od')
         self.assertIs(mSocketServer.TCPServer.allow_reuse_address, True)
         mSocketServer.TCPServer.assert_called_once_with(('', 8080), jujuresources.cli.SimpleHTTPRequestHandler)
@@ -182,6 +199,48 @@ class TestCLI(unittest.TestCase):
         jujuresources.cli.resources(['serve', '-d', 'od'])
         msys.stderr.write.assert_called_once_with("Resources dir 'od' not found.  Did you fetch?\n")
         mexit.assert_called_once_with(1)
+
+    @mock.patch('jujuresources.cli._exit')
+    @mock.patch('jujuresources.cli.print')
+    @mock.patch('jujuresources.cli._install')
+    @mock.patch('jujuresources.cli._load')
+    def test_install(self, mload, minstall, mprint, mexit):
+        mload.return_value = self.resources
+        minstall.return_value = True
+        jujuresources.cli.resources(['install'])
+        mload.assert_called_once_with('resources.yaml', None)
+        minstall.assert_called_once_with(self.resources, [], None, None, False)
+        mprint.assert_called_with('All resources successfully installed')
+        mexit.assert_called_with(0)
+
+    @mock.patch('jujuresources.cli._exit')
+    @mock.patch('jujuresources.cli.print')
+    @mock.patch('jujuresources.cli._invalid')
+    @mock.patch('jujuresources.cli._install')
+    @mock.patch('jujuresources.cli._load')
+    def test_install_fail(self, mload, minstall, minvalid, mprint, mexit):
+        mload.return_value = self.resources
+        minstall.return_value = False
+        minvalid.return_value = ['foo', 'bar']
+        jujuresources.cli.resources(['install'])
+        mload.assert_called_once_with('resources.yaml', None)
+        minstall.assert_called_once_with(self.resources, [], None, None, False)
+        mprint.assert_called_with('Unable to install some resources: foo, bar')
+        mexit.assert_called_with(1)
+
+    @mock.patch('jujuresources.cli._exit')
+    @mock.patch('jujuresources.cli.print')
+    @mock.patch('jujuresources.cli._install')
+    @mock.patch('jujuresources.cli._load')
+    def test_install_opts(self, mload, minstall, mprint, mexit):
+        mload.return_value = self.resources
+        minstall.return_value = False
+        jujuresources.cli.resources(['install', '-r', 'r.y', '-d', 'od', '-u', 'url',
+                                     '-D', 'dst', '-s', '-q', '-a'])
+        mload.assert_called_once_with('r.y', 'od')
+        minstall.assert_called_once_with(self.resources, ALL, 'url', 'dst', True)
+        assert not mprint.called
+        mexit.assert_called_with(1)
 
 
 if __name__ == '__main__':
