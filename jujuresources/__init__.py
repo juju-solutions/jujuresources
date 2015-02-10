@@ -10,19 +10,31 @@ from jujuresources.backend import ALL
 
 
 __all__ = ['fetch', 'verify', 'install', 'resource_path', 'resource_spec',
-           'ALL', 'config_get']
+           'ALL', 'config_get', 'juju_log']
 resources_cache = {}
 
 
 def config_get(option_name):
     """
     Helper to access a Juju config option when charmhelpers is not available.
+
+    :param str option_name: Name of the config option to get the value of
     """
     try:
         raw = subprocess.check_output(['config-get', option_name, '--format=yaml'])
         return yaml.load(raw.decode('UTF-8'))
     except ValueError:
         return None
+
+
+def juju_log(message, level='DEBUG'):
+    """
+    Helper to send Juju log messages when charmhelpers is not available.
+
+    :param str message: Message to log
+    :param str level: Log level (DEBUG, INFO, ERROR, WARNING, CRITICAL; default: DEBUG)
+    """
+    subprocess.check_call(['juju-log', '-l', level, message])
 
 
 def _load(resources_yaml, output_dir=None):
