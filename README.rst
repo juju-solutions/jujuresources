@@ -5,6 +5,8 @@ for network-restricted deployments.
 This is intended as a stop-gap until Juju has core support for resources,
 as well as to prototype what features are needed.
 
+The full documentation is available online at: http://pythonhosted.org/jujuresources/
+
 
 Installing
 ----------
