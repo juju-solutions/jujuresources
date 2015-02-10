@@ -269,6 +269,24 @@ class TestURLResource(unittest.TestCase):
         mmakedirs.assert_called_with('od')
         murlretrieve.assert_called_with('http://mirror.com/fn', 'od/fn')
 
+    @mock.patch.object(backend, 'urlopen')
+    @mock.patch.object(os, 'makedirs')
+    @mock.patch.object(os.path, 'exists')
+    @mock.patch.object(backend, 'urlretrieve')
+    def test_fetch_hash_url(self, murlretrieve, mexists, mmakedirs, murlopen):
+        res = backend.URLResource('name', {
+            'url': 'http://example.com/path/fn',
+            'hash': 'http://hash.com/',
+            'hash_type': 'hash_type',
+        }, 'od')
+        mexists.return_value = True
+        murlopen.return_value.read.return_value = 'myhash'
+        res.fetch()
+        assert not mmakedirs.called
+        murlretrieve.assert_called_with('http://example.com/path/fn', 'od/fn')
+        murlopen.assert_called_with('http://hash.com/')
+        self.assertEqual(res.hash, 'myhash')
+
 
 class TestPyPIResource(unittest.TestCase):
     test_data = os.path.join(os.path.dirname(__file__), 'data')
@@ -282,6 +300,18 @@ class TestPyPIResource(unittest.TestCase):
         self.assertEqual(res.destination, '')
         self.assertEqual(res.hash, '')
         self.assertEqual(res.hash_type, '')
+        res = backend.PyPIResource('name', {'pypi': 'http://example.com/foo#egg=jujuresources'}, 'od')
+        self.assertEqual(res.spec, 'http://example.com/foo#egg=jujuresources')
+        self.assertEqual(res.package_name, 'jujuresources')
+        self.assertEqual(res.filename, 'foo')
+        self.assertEqual(res.destination, 'od/jujuresources/foo')
+        res = backend.PyPIResource('name', {'pypi': 'http://example.com/foo'}, 'od')
+        self.assertEqual(res.package_name, '')
+        self.assertEqual(res.filename, 'foo')
+        self.assertEqual(res.destination, 'od/foo')
+        res = backend.PyPIResource('name', {'pypi': 'foo', 'hash': 'h', 'hash_type': 'ht'}, 'od')
+        self.assertEqual(res.hash, 'h')
+        self.assertEqual(res.hash_type, 'ht')
 
     @mock.patch.object(os, 'listdir')
     @mock.patch.object(backend, 'subprocess')
@@ -343,9 +373,9 @@ class TestPyPIResource(unittest.TestCase):
 
     @mock.patch.object(subprocess, 'check_output')
     @mock.patch.object(os, 'makedirs')
-    @mock.patch.object(os.path, 'isdir')
-    def test_fetch_fail(self, misdir, mmakedirs, mcheck_output):
-        misdir.return_value = True
+    @mock.patch.object(os.path, 'exists')
+    def test_fetch_fail(self, mexists, mmakedirs, mcheck_output):
+        mexists.return_value = True
         res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, 'od')
         res.get_remote_hash = mock.Mock()
         mcheck_output.side_effect = subprocess.CalledProcessError(
@@ -357,6 +387,43 @@ class TestPyPIResource(unittest.TestCase):
                 '--download', 'od/jujuresources'],
             stderr=subprocess.STDOUT)
         assert not res.get_remote_hash.called
+
+    @mock.patch.object(os, 'listdir')
+    @mock.patch.object(backend, 'subprocess')
+    @mock.patch.object(os, 'makedirs')
+    @mock.patch.object(os.path, 'exists')
+    def test_fetch_urlspec(self, mexists, mmakedirs, msubprocess, mlistdir):
+        mexists.return_value = True
+        mmakedirs.side_effect = AssertionError('makedirs should not be called')
+        mlistdir.return_value = ['bar-0.2.tgz']
+        res = backend.PyPIResource('name', {
+            'pypi': 'http://example.com/foo#egg=bar',
+            'hash': 'hash',
+            'hash_type': 'hash_type',
+        }, 'od')
+        res.get_remote_hash = mock.Mock(side_effect=AssertionError('get_remote_hash should not be called'))
+        res.fetch()
+        msubprocess.check_output.assert_called_once_with(
+            ['pip', 'install', 'http://example.com/foo#egg=bar',
+                '--download', 'od/bar'],
+            stderr=msubprocess.STDOUT)
+        self.assertEqual(res.hash, 'hash')
+        self.assertEqual(res.hash_type, 'hash_type')
+
+    @mock.patch.object(os, 'listdir')
+    @mock.patch.object(backend, 'subprocess')
+    @mock.patch.object(os, 'makedirs')
+    @mock.patch.object(os.path, 'exists')
+    def test_fetch_urlspec_no_package(self, mexists, mmakedirs, msubprocess, mlistdir):
+        mexists.return_value = True
+        mmakedirs.side_effect = AssertionError('makedirs should not be called')
+        mlistdir.side_effect = AssertionError('listdir should not be called')
+        res = backend.PyPIResource('name', {'pypi': 'http://example.com/foo'}, 'od')
+        res.fetch()
+        msubprocess.check_output.assert_called_once_with(
+            ['pip', 'install', 'http://example.com/foo',
+                '--download', 'od/'],
+            stderr=msubprocess.STDOUT)
 
     def test_verify(self):
         res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, self.test_data)

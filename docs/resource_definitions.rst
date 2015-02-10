@@ -20,12 +20,16 @@ the following sets of keys:
 **URL Resources**
 
   * ``url`` URL for the resource
-  * ``hash`` Cryptographic hash for the resource
+  * ``hash`` Cryptographic hash for the resource (can also be a URL to a hash)
   * ``hash_type`` Algorithm used to generate the hash; e.g., md5, sha512, etc.
 
 **PyPI Resources**
 
-  * ``pypi`` A Python package requirement spec, such as ``jujuresources>=0.2``.
+  * ``pypi`` A Python package requirement spec, such as ``jujuresources>=0.2``
+    (can also be a URL directly to a package)
+  * ``hash`` Cryptographic hash for the resource (for use with package URLs)
+  * ``hash_type`` Algorithm used to generate the hash; e.g., md5, sha512, etc.
+    (for use with package URLs)
 
 **Local or Bundled File Resources**
 

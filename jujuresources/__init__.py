@@ -210,4 +210,4 @@ def install(which=None, mirror_url=None, destination=None, skip_top_level=False,
     :returns: True if all resources were successfully installed.
     """
     resources = _load(resources_yaml, None)
-    return _install(resources, mirror_url, destination, skip_top_level)
+    return _install(resources, which, mirror_url, destination, skip_top_level)

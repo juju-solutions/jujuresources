@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tarfile
 from urllib import urlretrieve, urlopen
-from urlparse import urlparse, urljoin
+from urlparse import urlparse, urljoin, parse_qs
 import zipfile
 
 
@@ -155,17 +155,32 @@ class URLResource(Resource):
         except IOError as e:
             if VERBOSE:
                 sys.stderr.write('Error fetching {}: {}\n'.format(self.url, e))
-            # ignore download errors; they will be caught by verify
+            return  # ignore download errors; they will be caught by verify
+        if urlparse(self.hash).scheme:
+            try:
+                with closing(urlopen(self.hash)) as fp:
+                    self.hash = fp.read().strip()
+            except IOError as e:
+                if VERBOSE:
+                    sys.stderr.write('Error fetching hash {}: {}\n'.format(self.url, e))
+                return  # ignore download errors; they will be caught by verify
 
 
 class PyPIResource(Resource):
     def __init__(self, name, definition, output_dir):
         super(PyPIResource, self).__init__(name, definition, output_dir)
         self.spec = definition.get('pypi', '')
-        self.package_name = re.sub(r'[<>=].*', '', self.spec)
-        self.destination_dir = os.path.join(self.output_dir, self.package_name)
-        self.filename = ''
-        self.destination = ''
+        urlspec = urlparse(self.spec)
+        if urlspec.scheme:
+            self.package_name = parse_qs(re.sub(r'^#', '', urlspec.fragment)).get('egg', [''])[0]
+            self.destination_dir = os.path.join(self.output_dir, self.package_name)
+            self.filename = os.path.basename(urlspec.path)
+            self.destination = os.path.join(self.destination_dir, self.filename)
+        else:
+            self.package_name = re.sub(r'[<>=].*', '', self.spec)
+            self.destination_dir = os.path.join(self.output_dir, self.package_name)
+            self.filename = ''
+            self.destination = ''
 
     def fetch(self, mirror_url=None):
         if not os.path.exists(self.destination_dir):
@@ -182,18 +197,20 @@ class PyPIResource(Resource):
         if not mirror_url:
             mirror_url = 'https://pypi.python.org/simple'
         mirror_url = mirror_url.rstrip('/') + '/'  # ensure trailing slash
-        for filename in os.listdir(self.destination_dir):
-            if filename.startswith(self.package_name):
-                self.filename = filename
-                self.destination = os.path.join(self.destination_dir, filename)
-                hash_type, hash = self.get_remote_hash(self.filename, mirror_url)
-                self.hash = hash
-                self.hash_type = hash_type
-                if hash_type:
-                    hash_file = '.'.join([self.destination, self.hash_type])
-                    self._write_file(hash_file, self.hash + '\n')
-            else:
-                self.process_dependency(filename, mirror_url)
+        if self.package_name:
+            for filename in os.listdir(self.destination_dir):
+                if filename.startswith(self.package_name):
+                    self.filename = filename
+                    self.destination = os.path.join(self.destination_dir, filename)
+                    if not self.hash or not self.hash_type:
+                        hash_type, hash = self.get_remote_hash(self.filename, mirror_url)
+                        self.hash = hash
+                        self.hash_type = hash_type
+                        if hash_type:
+                            hash_file = '.'.join([self.destination, self.hash_type])
+                            self._write_file(hash_file, self.hash + '\n')
+                else:
+                    self.process_dependency(filename, mirror_url)
 
     def verify(self):
         self.get_local_hash()
