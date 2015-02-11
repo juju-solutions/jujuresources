@@ -304,7 +304,7 @@ class TestPyPIResource(unittest.TestCase):
         self.assertEqual(res.spec, 'http://example.com/foo#egg=jujuresources')
         self.assertEqual(res.package_name, 'jujuresources')
         self.assertEqual(res.filename, 'foo')
-        self.assertEqual(res.destination, 'od/jujuresources/foo')
+        self.assertEqual(res.destination, 'od/foo')
         res = backend.PyPIResource('name', {'pypi': 'http://example.com/foo'}, 'od')
         self.assertEqual(res.package_name, '')
         self.assertEqual(res.filename, 'foo')
@@ -389,10 +389,10 @@ class TestPyPIResource(unittest.TestCase):
         assert not res.get_remote_hash.called
 
     @mock.patch.object(os, 'listdir')
-    @mock.patch.object(backend, 'subprocess')
+    @mock.patch.object(backend.URLResource, 'fetch')
     @mock.patch.object(os, 'makedirs')
     @mock.patch.object(os.path, 'exists')
-    def test_fetch_urlspec(self, mexists, mmakedirs, msubprocess, mlistdir):
+    def test_fetch_urlspec(self, mexists, mmakedirs, murlfetch, mlistdir):
         mexists.return_value = True
         mmakedirs.side_effect = AssertionError('makedirs should not be called')
         mlistdir.return_value = ['bar-0.2.tgz']
@@ -403,27 +403,9 @@ class TestPyPIResource(unittest.TestCase):
         }, 'od')
         res.get_remote_hash = mock.Mock(side_effect=AssertionError('get_remote_hash should not be called'))
         res.fetch()
-        msubprocess.check_output.assert_called_once_with(
-            ['pip', 'install', 'http://example.com/foo#egg=bar',
-                '--download', 'od/bar'],
-            stderr=msubprocess.STDOUT)
+        murlfetch.assert_called_once_with(None)
         self.assertEqual(res.hash, 'hash')
         self.assertEqual(res.hash_type, 'hash_type')
-
-    @mock.patch.object(os, 'listdir')
-    @mock.patch.object(backend, 'subprocess')
-    @mock.patch.object(os, 'makedirs')
-    @mock.patch.object(os.path, 'exists')
-    def test_fetch_urlspec_no_package(self, mexists, mmakedirs, msubprocess, mlistdir):
-        mexists.return_value = True
-        mmakedirs.side_effect = AssertionError('makedirs should not be called')
-        mlistdir.side_effect = AssertionError('listdir should not be called')
-        res = backend.PyPIResource('name', {'pypi': 'http://example.com/foo'}, 'od')
-        res.fetch()
-        msubprocess.check_output.assert_called_once_with(
-            ['pip', 'install', 'http://example.com/foo',
-                '--download', 'od/'],
-            stderr=msubprocess.STDOUT)
 
     def test_verify(self):
         res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, self.test_data)

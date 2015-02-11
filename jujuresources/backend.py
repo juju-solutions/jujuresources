@@ -166,23 +166,27 @@ class URLResource(Resource):
                 return  # ignore download errors; they will be caught by verify
 
 
-class PyPIResource(Resource):
+class PyPIResource(URLResource):
     def __init__(self, name, definition, output_dir):
         super(PyPIResource, self).__init__(name, definition, output_dir)
         self.spec = definition.get('pypi', '')
         urlspec = urlparse(self.spec)
         if urlspec.scheme:
+            self.url = self.spec
             self.package_name = parse_qs(re.sub(r'^#', '', urlspec.fragment)).get('egg', [''])[0]
-            self.destination_dir = os.path.join(self.output_dir, self.package_name)
+            self.destination_dir = self.output_dir
             self.filename = os.path.basename(urlspec.path)
             self.destination = os.path.join(self.destination_dir, self.filename)
         else:
+            self.url = ''
             self.package_name = re.sub(r'[<>=].*', '', self.spec)
             self.destination_dir = os.path.join(self.output_dir, self.package_name)
             self.filename = ''
             self.destination = ''
 
     def fetch(self, mirror_url=None):
+        if self.url:
+            return super(PyPIResource, self).fetch(mirror_url)
         if not os.path.exists(self.destination_dir):
             os.makedirs(self.destination_dir)
         cmd = ['pip', 'install', self.spec, '--download', self.destination_dir]
@@ -197,26 +201,27 @@ class PyPIResource(Resource):
         if not mirror_url:
             mirror_url = 'https://pypi.python.org/simple'
         mirror_url = mirror_url.rstrip('/') + '/'  # ensure trailing slash
-        if self.package_name:
-            for filename in os.listdir(self.destination_dir):
-                if filename.startswith(self.package_name):
-                    self.filename = filename
-                    self.destination = os.path.join(self.destination_dir, filename)
-                    if not self.hash or not self.hash_type:
-                        hash_type, hash = self.get_remote_hash(self.filename, mirror_url)
-                        self.hash = hash
-                        self.hash_type = hash_type
-                        if hash_type:
-                            hash_file = '.'.join([self.destination, self.hash_type])
-                            self._write_file(hash_file, self.hash + '\n')
-                else:
-                    self.process_dependency(filename, mirror_url)
+        for filename in os.listdir(self.destination_dir):
+            if filename.startswith(self.package_name):
+                self.filename = filename
+                self.destination = os.path.join(self.destination_dir, filename)
+                if not self.hash or not self.hash_type:
+                    hash_type, hash = self.get_remote_hash(self.filename, mirror_url)
+                    self.hash = hash
+                    self.hash_type = hash_type
+                    if hash_type:
+                        hash_file = '.'.join([self.destination, self.hash_type])
+                        self._write_file(hash_file, self.hash + '\n')
+            else:
+                self.process_dependency(filename, mirror_url)
 
     def verify(self):
         self.get_local_hash()
         return super(PyPIResource, self).verify()
 
     def get_local_hash(self):
+        if self.url:
+            return
         if not os.path.isdir(self.destination_dir):
             return
         for filename in os.listdir(self.destination_dir):
