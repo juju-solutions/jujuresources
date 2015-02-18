@@ -76,7 +76,7 @@ def _install(resources, which, mirror_url, destination, skip_top_level):
         if isinstance(resource, PyPIResource):
             # group pypi resources to reduce subprocess calls
             pypi_resources.append(resource)
-        elif destination is not None:
+        else:
             success = resource.install(destination, skip_top_level) and success
     if pypi_resources:
         success = PyPIResource.install_group(pypi_resources, mirror_url) and success
