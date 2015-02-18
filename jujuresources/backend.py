@@ -97,6 +97,8 @@ class Resource(object):
     def install(self, destination, skip_top_level=False):
         if not self.verify():
             return False
+        if not destination:
+            raise ValueError('Destination is required for install of: {}' % self.name)
 
         def filter_members(af):
             members = af.infolist() if hasattr(af, 'infolist') else af
