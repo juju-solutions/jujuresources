@@ -89,7 +89,8 @@ class Resource(object):
             return False
         with open(self.destination) as fp:
             hash = hashlib.new(self.hash_type)
-            hash.update(fp.read())
+            for chunk in iter(lambda: fp.read(1024), ''):  # read chunks until nothing returned
+                hash.update(chunk)
             if self.hash != hash.hexdigest():
                 return False
         return True
@@ -161,7 +162,7 @@ class URLResource(Resource):
         if urlparse(self.hash).scheme:
             try:
                 with closing(urlopen(self.hash)) as fp:
-                    self.hash = fp.read().strip()
+                    self.hash = fp.read(1024).strip()  # hashes should never be that big
             except IOError as e:
                 if VERBOSE:
                     sys.stderr.write('Error fetching hash {}: {}\n'.format(self.url, e))
@@ -241,22 +242,22 @@ class PyPIResource(URLResource):
     def get_remote_hash(self, filename, mirror_url):
         package_name = self._package_name_from_filename(filename, mirror_url)
         url = urljoin(mirror_url, package_name)
+        link_re = (
+            r'href=(?:"(?:[^"]*/)?|\'(?:[^\']*/)?)'
+            '{}#([^=]+)=(\w+)["\']'.format(re.escape(filename)))
         try:
             with closing(urlopen(url)) as fp:
-                html = fp.read()
+                for line in fp:
+                    match = re.search(link_re, line)
+                    if match:
+                        return match.groups()
         except IOError as e:
             if VERBOSE:
                 sys.stderr.write('Error fetching hash {}: {}\n'.format(url, e))
             return ('', '')
-        link_re = (
-            r'href=(?:"(?:[^"]*/)?|\'(?:[^\']*/)?)'
-            '{}#([^=]+)=(\w+)["\']'.format(re.escape(filename)))
-        match = re.search(link_re, html)
-        if not match:
-            if VERBOSE:
-                sys.stderr.write('Hash not found for {}\n'.format(filename))
-            return ('', '')
-        return match.groups()
+        if VERBOSE:
+            sys.stderr.write('Hash not found for {}\n'.format(filename))
+        return ('', '')
 
     def process_dependency(self, filename, mirror_url):
         # pip will download all dependencies into the same directory
@@ -292,14 +293,16 @@ class PyPIResource(URLResource):
     @classmethod
     def _get_index(cls, url):
         if not getattr(cls, '_index', None):
+            cls._index = set()
             try:
                 with closing(urlopen(url)) as fp:
-                    html = fp.read()
+                    for line in fp:
+                        matches = re.findall(r'<a href=(?:"[^"]*"|\'[^\']*\')>([^</]+)', line)
+                        for project in matches:
+                            cls._index.add(project)
             except IOError as e:
                 if VERBOSE:
                     sys.stderr.write('Error fetching index {}: {}\n'.format(url, e))
-                html = ''
-            cls._index = set(re.findall(r'<a href=(?:"[^"]*"|\'[^\']*\')>([^</]+)', html))
         return cls._index
 
     def _write_file(self, filename, text):
