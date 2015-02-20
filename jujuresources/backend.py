@@ -153,6 +153,8 @@ class URLResource(Resource):
             url = url[2:]  # urlretrieve complains about this for some reason
         if not os.path.exists(os.path.dirname(self.destination)):
             os.makedirs(os.path.dirname(self.destination))
+        if os.path.exists(self.destination):
+            os.remove(self.destination)  # urlretrieve won't overwrite
         try:
             urlretrieve(url, self.destination)
         except IOError as e:
@@ -190,8 +192,9 @@ class PyPIResource(URLResource):
     def fetch(self, mirror_url=None):
         if self.url:
             return super(PyPIResource, self).fetch(mirror_url)
-        if not os.path.exists(self.destination_dir):
-            os.makedirs(self.destination_dir)
+        if os.path.exists(self.destination_dir):
+            shutil.rmtree(self.destination_dir)  # `pip --download` won't overwrite
+        os.makedirs(self.destination_dir)
         cmd = ['pip', 'install', self.spec, '--download', self.destination_dir]
         if mirror_url:
             cmd.extend(['-i', mirror_url])

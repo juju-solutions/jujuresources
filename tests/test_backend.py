@@ -250,10 +250,11 @@ class TestURLResource(unittest.TestCase):
         }, 'od')
         self.assertEqual(res.destination, 'dst')
 
+    @mock.patch.object(os, 'remove')
     @mock.patch.object(os, 'makedirs')
     @mock.patch.object(os.path, 'exists')
     @mock.patch.object(backend, 'urlretrieve')
-    def test_fetch(self, murlretrieve, mexists, mmakedirs):
+    def test_fetch(self, murlretrieve, mexists, mmakedirs, mremove):
         res = backend.URLResource('name', {
             'url': 'http://example.com/path/fn',
             'hash': 'hash',
@@ -262,6 +263,7 @@ class TestURLResource(unittest.TestCase):
         mexists.return_value = True
         res.fetch()
         assert not mmakedirs.called
+        mremove.assert_called_with('od/fn')
         murlretrieve.assert_called_with('http://example.com/path/fn', 'od/fn')
 
         mexists.return_value = False
@@ -270,10 +272,11 @@ class TestURLResource(unittest.TestCase):
         murlretrieve.assert_called_with('http://mirror.com/fn', 'od/fn')
 
     @mock.patch.object(backend, 'urlopen')
+    @mock.patch.object(os, 'remove')
     @mock.patch.object(os, 'makedirs')
     @mock.patch.object(os.path, 'exists')
     @mock.patch.object(backend, 'urlretrieve')
-    def test_fetch_hash_url(self, murlretrieve, mexists, mmakedirs, murlopen):
+    def test_fetch_hash_url(self, murlretrieve, mexists, mmakedirs, mremove, murlopen):
         res = backend.URLResource('name', {
             'url': 'http://example.com/path/fn',
             'hash': 'http://hash.com/',
@@ -283,6 +286,7 @@ class TestURLResource(unittest.TestCase):
         murlopen.return_value.read.return_value = 'myhash'
         res.fetch()
         assert not mmakedirs.called
+        mremove.assert_called_with('od/fn')
         murlretrieve.assert_called_with('http://example.com/path/fn', 'od/fn')
         murlopen.assert_called_with('http://hash.com/')
         self.assertEqual(res.hash, 'myhash')
@@ -316,8 +320,9 @@ class TestPyPIResource(unittest.TestCase):
     @mock.patch.object(os, 'listdir')
     @mock.patch.object(backend, 'subprocess')
     @mock.patch.object(os, 'makedirs')
+    @mock.patch.object(shutil, 'rmtree')
     @mock.patch.object(os.path, 'exists')
-    def test_fetch(self, mexists, mmakedirs, msubprocess, mlistdir):
+    def test_fetch(self, mexists, mrmtree, mmakedirs, msubprocess, mlistdir):
         mexists.return_value = False
         res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, 'od')
         res.get_remote_hash = mock.Mock()
@@ -326,6 +331,7 @@ class TestPyPIResource(unittest.TestCase):
         mlistdir.return_value = ['pyaml-3.0.tgz', 'jujuresources-0.2.tgz']
         res.get_remote_hash.return_value = ('hash_type', 'hash')
         res.fetch()
+        assert not mrmtree.called
         mmakedirs.assert_called_with(res.destination_dir)
         msubprocess.check_output.assert_called_once_with(
             ['pip', 'install', 'jujuresources>=0.2',
@@ -345,8 +351,9 @@ class TestPyPIResource(unittest.TestCase):
     @mock.patch.object(os, 'listdir')
     @mock.patch.object(backend, 'subprocess')
     @mock.patch.object(os, 'makedirs')
+    @mock.patch.object(shutil, 'rmtree')
     @mock.patch.object(os.path, 'exists')
-    def test_fetch_mirror(self, mexists, mmakedirs, msubprocess, mlistdir):
+    def test_fetch_mirror(self, mexists, mrmtree, mmakedirs, msubprocess, mlistdir):
         mexists.return_value = True
         res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, 'od')
         res.get_remote_hash = mock.Mock()
@@ -355,7 +362,8 @@ class TestPyPIResource(unittest.TestCase):
         mlistdir.return_value = ['pyaml-3.0.tgz', 'jujuresources-0.2.tgz']
         res.get_remote_hash.return_value = ('hash_type', 'hash')
         res.fetch('mirror')
-        assert not mmakedirs.called
+        assert mrmtree.called
+        assert mmakedirs.called
         msubprocess.check_output.assert_called_once_with(
             ['pip', 'install', 'jujuresources>=0.2',
                 '--download', 'od/jujuresources',
@@ -373,8 +381,9 @@ class TestPyPIResource(unittest.TestCase):
 
     @mock.patch.object(subprocess, 'check_output')
     @mock.patch.object(os, 'makedirs')
+    @mock.patch.object(shutil, 'rmtree')
     @mock.patch.object(os.path, 'exists')
-    def test_fetch_fail(self, mexists, mmakedirs, mcheck_output):
+    def test_fetch_fail(self, mexists, mrmtree, mmakedirs, mcheck_output):
         mexists.return_value = True
         res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, 'od')
         res.get_remote_hash = mock.Mock()
