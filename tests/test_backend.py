@@ -173,34 +173,11 @@ class TestResource(unittest.TestCase):
 
     @mock.patch('tarfile.is_tarfile', mock.Mock(return_value=False))
     def test_install_tgz_workaround(self):
-        res = backend.Resource('name', {
-            'file': 'test.tgz',
-            'hash': '347153cce7f15a6d3e47d34fbccb6afa',
-            'hash_type': 'md5',
-        }, self.test_data)
-        tmpdir = mkdtemp()
-        try:
-            assert res.install(tmpdir)
-            self.assertItemsEqual(os.listdir(tmpdir), ['toplevel'])
-            self.assertItemsEqual(os.listdir(os.path.join(tmpdir, 'toplevel')), ['foo', 'bar'])
-        finally:
-            shutil.rmtree(tmpdir)
+        self.test_install_tgz()
 
     @mock.patch('tarfile.is_tarfile', mock.Mock(return_value=False))
     def test_install_tgz_skip_top_level_workaround(self):
-        res = backend.Resource('name', {
-            'file': 'test.tgz',
-            'hash': '347153cce7f15a6d3e47d34fbccb6afa',
-            'hash_type': 'md5',
-        }, self.test_data)
-        tmpdir = mkdtemp()
-        os.rmdir(tmpdir)
-        try:
-            assert res.install(tmpdir, skip_top_level=True)
-            self.assertItemsEqual(os.listdir(tmpdir), ['foo', 'bar'])
-            self.assertItemsEqual(os.listdir(os.path.join(tmpdir, 'bar')), ['qux'])
-        finally:
-            shutil.rmtree(tmpdir)
+        self.test_install_tgz_skip_top_level()
 
     def test_install_zip(self):
         res = backend.Resource('name', {
