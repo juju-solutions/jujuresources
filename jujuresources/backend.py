@@ -129,9 +129,36 @@ class Resource(object):
         elif zipfile.is_zipfile(self.destination):
             with zipfile.ZipFile(self.destination, 'r') as zf:
                 zf.extractall(destination, members=filter_members(zf))
+        elif self._is_bugged_tarfile():
+            self._handle_bugged_tarfile(destination, skip_top_level)
         else:
             shutil.copy2(self.destination, destination)
         return True
+
+    def _is_bugged_tarfile(self):
+        """
+        Check for tar file that tarfile library mistakenly reports as invalid.
+
+        Happens with tar files created on FAT systems.  See:
+        http://stackoverflow.com/questions/25552162/tarfile-readerror-file-could-not-be-opened-successfully
+        """
+        try:
+            output = subprocess.check_output(['file', '-z', self.destination])
+            return 'tar archive' in output and 'gzip compressed data' in output
+        except subprocess.CalledProcessError:
+            return False
+
+    def _handle_bugged_tarfile(self, destination, skip_top_level):
+        """
+        Handle tar file that tarfile library mistakenly reports as invalid.
+
+        Happens with tar files created on FAT systems.  See:
+        http://stackoverflow.com/questions/25552162/tarfile-readerror-file-could-not-be-opened-successfully
+        """
+        args = ['tar', '-xzf', self.destination, '-C', destination]
+        if skip_top_level:
+            args.extend(['--strip-components', '1'])
+        subprocess.check_call(args)
 
 
 class URLResource(Resource):
