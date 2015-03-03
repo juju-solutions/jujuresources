@@ -89,7 +89,7 @@ class Resource(object):
             return False
         with open(self.destination) as fp:
             hash = hashlib.new(self.hash_type)
-            for chunk in iter(lambda: fp.read(1024), ''):  # read chunks until nothing returned
+            for chunk in iter(lambda: fp.read(16*1024), ''):  # read chunks until nothing returned
                 hash.update(chunk)
             if self.hash != hash.hexdigest():
                 return False
@@ -99,7 +99,7 @@ class Resource(object):
         if not self.verify():
             return False
         if not destination:
-            raise ValueError('Destination is required for install of: {}' % self.name)
+            raise ValueError('Destination is required for install of: %s' % self.name)
 
         def filter_members(af):
             members = af.infolist() if hasattr(af, 'infolist') else af
@@ -191,7 +191,7 @@ class URLResource(Resource):
         if urlparse(self.hash).scheme:
             try:
                 with closing(urlopen(self.hash)) as fp:
-                    self.hash = fp.read(1024).strip()  # hashes should never be that big
+                    self.hash = fp.read(8*1024).strip()  # hashes should never be that big
             except IOError as e:
                 if VERBOSE:
                     sys.stderr.write('Error fetching hash {}: {}\n'.format(self.url, e))
