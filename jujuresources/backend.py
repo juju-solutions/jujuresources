@@ -10,7 +10,6 @@ from urllib import urlretrieve, urlopen
 from urlparse import urlparse, urljoin, parse_qs
 import zipfile
 
-
 VERBOSE = False
 
 
@@ -45,7 +44,7 @@ class ResourceContainer(dict):
             return self.required()
         if which is ALL:
             return self.all()
-        if not isinstance(which, list):
+        if not isinstance(which, (list, tuple)):
             return [self[which]]
         return [self[name] for name in which]
 
