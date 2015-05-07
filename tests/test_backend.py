@@ -9,6 +9,10 @@ from tempfile import mkdtemp
 
 from jujuresources import backend
 
+if not hasattr(unittest.TestCase, 'assertItemsEqual'):
+    # for Python 3.  assertCountEqual is a stupid name
+    unittest.TestCase.assertItemsEqual = unittest.TestCase.assertCountEqual
+
 
 class TestResourceContainer(unittest.TestCase):
     @mock.patch.object(backend.Resource, 'get')

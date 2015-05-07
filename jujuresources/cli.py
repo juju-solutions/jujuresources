@@ -5,8 +5,15 @@ import sys
 import socket
 import argparse
 from pkg_resources import iter_entry_points
-from SimpleHTTPServer import SimpleHTTPRequestHandler
-import SocketServer
+
+try:
+    # Python 3
+    from http.server import SimpleHTTPRequestHandler
+    from http.server import HTTPServer
+except ImportError:
+    # Python 2
+    from SimpleHTTPServer import SimpleHTTPRequestHandler
+    from SocketServer import TCPServer as HTTPServer
 
 from jujuresources import _fetch
 from jujuresources import _install
@@ -61,7 +68,7 @@ def resources(argv=sys.argv[1:]):
     subparsers['help'] = subparser_factory.add_parser('help', help='Display help for a subcommand')
     subparsers['help'].add_argument('command', nargs='?')
     subparsers['help'].set_defaults(subcommand='help')
-    for name, subcommand in ep_map.iteritems():
+    for name, subcommand in ep_map.items():
         subparsers[name] = subparser_factory.add_parser(name, help=subcommand.__doc__)
         subparsers[name].set_defaults(subcommand=subcommand)
         for args, kwargs in getattr(subcommand, '_subcommand_args', []):
@@ -231,8 +238,8 @@ def serve(opts):
     backend.PyPIResource.build_pypi_indexes(opts.output_dir)
     os.chdir(opts.output_dir)
 
-    SocketServer.TCPServer.allow_reuse_address = True
-    httpd = SocketServer.TCPServer((opts.host, opts.port), SimpleHTTPRequestHandler)
+    HTTPServer.allow_reuse_address = True
+    httpd = HTTPServer((opts.host, opts.port), SimpleHTTPRequestHandler)
 
     if opts.ssl_cert:
         httpd.socket = ssl.wrap_socket(httpd.socket, certfile=opts.ssl_cert, server_side=True)

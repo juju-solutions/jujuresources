@@ -6,9 +6,18 @@ import shutil
 import subprocess
 import sys
 import tarfile
-from urllib import urlretrieve, urlopen
-from urlparse import urlparse, urljoin, parse_qs
 import zipfile
+
+try:
+    # Python 3
+    from urllib.request import urlretrieve, urlopen
+    from urllib.parse import urlparse, urljoin, parse_qs
+    from hashlib import algorithms_available as hashlib_algs
+except ImportError:
+    # Python 2
+    from urllib import urlretrieve, urlopen
+    from urlparse import urlparse, urljoin, parse_qs
+    from hashlib import algorithms as hashlib_algs
 
 VERBOSE = False
 
@@ -82,13 +91,13 @@ class Resource(object):
         return
 
     def verify(self):
-        if self.hash_type not in hashlib.algorithms:
+        if self.hash_type not in hashlib_algs:
             return False
         if not os.path.isfile(self.destination):
             return False
-        with open(self.destination) as fp:
+        with open(self.destination, 'rb') as fp:
             hash = hashlib.new(self.hash_type)
-            for chunk in iter(lambda: fp.read(16*1024), ''):  # read chunks until nothing returned
+            for chunk in iter(lambda: fp.read(16*1024), b''):  # read chunks until nothing returned
                 hash.update(chunk)
             if self.hash != hash.hexdigest():
                 return False
@@ -142,7 +151,7 @@ class Resource(object):
         http://stackoverflow.com/questions/25552162/tarfile-readerror-file-could-not-be-opened-successfully
         """
         try:
-            output = subprocess.check_output(['file', '-z', self.destination])
+            output = subprocess.check_output(['file', '-z', self.destination]).decode('utf8')
             return 'tar archive' in output and 'gzip compressed data' in output
         except subprocess.CalledProcessError:
             return False
@@ -258,7 +267,7 @@ class PyPIResource(URLResource):
             return
         for filename in os.listdir(self.destination_dir):
             fullname = os.path.join(self.destination_dir, filename)
-            for hash_type in hashlib.algorithms:
+            for hash_type in hashlib_algs:
                 hash_file = '{}.{}'.format(fullname, hash_type)
                 if os.path.isfile(hash_file):
                     self.filename = filename

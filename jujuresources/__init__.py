@@ -2,7 +2,7 @@ import contextlib
 import subprocess
 
 try:
-    from urllib.requests import urlopen  # Python 3
+    from urllib.request import urlopen  # Python 3
 except ImportError:
     from urllib import urlopen  # Python 2
 
@@ -43,13 +43,14 @@ def juju_log(message, level='DEBUG'):
 
 def _load(resources_yaml, output_dir=None):
     if (resources_yaml, output_dir) not in resources_cache:
-        with contextlib.closing(urlopen(resources_yaml)) as fp:
+        url = 'file://%s' % resources_yaml if resources_yaml.startswith('/') else resources_yaml
+        with contextlib.closing(urlopen(url)) as fp:
             resdefs = yaml.load(fp)
         _output_dir = output_dir or resdefs.get('options', {}).get('output_dir', 'resources')
         resources = ResourceContainer(_output_dir)
-        for name, resource in resdefs.get('resources', {}).iteritems():
+        for name, resource in resdefs.get('resources', {}).items():
             resources.add_required(name, resource)
-        for name, resource in resdefs.get('optional_resources', {}).iteritems():
+        for name, resource in resdefs.get('optional_resources', {}).items():
             resources.add_optional(name, resource)
         resources_cache[(resources_yaml, output_dir)] = resources
     return resources_cache[(resources_yaml, output_dir)]

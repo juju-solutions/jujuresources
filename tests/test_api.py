@@ -4,6 +4,10 @@ import unittest
 
 import jujuresources
 
+if not hasattr(unittest.TestCase, 'assertItemsEqual'):
+    # for Python 3.  assertCountEqual is a stupid name
+    unittest.TestCase.assertItemsEqual = unittest.TestCase.assertCountEqual
+
 
 class TestAPI(unittest.TestCase):
     test_data = os.path.join(os.path.dirname(__file__), 'data')
