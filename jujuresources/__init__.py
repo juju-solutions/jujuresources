@@ -1,6 +1,10 @@
 import contextlib
 import subprocess
-from urllib import urlopen
+
+try:
+    from urllib.requests import urlopen  # Python 3
+except ImportError:
+    from urllib import urlopen  # Python 2
 
 import yaml
 
