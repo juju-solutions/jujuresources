@@ -339,8 +339,7 @@ class PyPIResource(URLResource):
                         for project in matches:
                             cls._index.add(project)
             except IOError as e:
-                if VERBOSE:
-                    sys.stderr.write('Error fetching index {}: {}\n'.format(url, e))
+                sys.stderr.write('Error fetching index {}: {}\n'.format(url, e))
         return cls._index
 
     def _write_file(self, filename, text):
