@@ -147,8 +147,18 @@ def fetch(which=None, mirror_url=None, resources_yaml='resources.yaml',
         downloaded.
     """
     resources = _load(resources_yaml, None)
+    if reporthook is None:
+        reporthook = lambda r: juju_log('Fetching %s' % r, level='INFO')
     _fetch(resources, which, mirror_url, force, reporthook)
-    return not _invalid(resources, which)
+    failed = _invalid(resources, which)
+    if failed:
+        juju_log('Failed to fetch resource%s: %s' % (
+            's' if len(failed) > 1 else '',
+            ', '.join(failed)
+        ), level='WARNING')
+    else:
+        juju_log('All resources successfully fetched', level='INFO')
+    return not failed
 
 
 def resource_path(resource_name, resources_yaml='resources.yaml'):
