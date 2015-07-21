@@ -10,16 +10,35 @@ import zipfile
 
 try:
     # Python 3
-    from urllib.request import urlretrieve, urlopen
+    from urllib.request import FancyURLopener
     from urllib.parse import urlparse, urljoin, parse_qs
     from hashlib import algorithms_available as hashlib_algs
 except ImportError:
     # Python 2
-    from urllib import urlretrieve, urlopen
+    from urllib import FancyURLopener
     from urlparse import urlparse, urljoin, parse_qs
     from hashlib import algorithms as hashlib_algs
 
 VERBOSE = False
+
+
+class URLError(IOError):
+    def __init__(self, url, code, msg, headers):
+        self.url = url
+        self.code = code
+        self.msg = msg
+        self.headers = headers
+
+    def __str__(self):
+        return '%s (%s)' % (self.code, self.msg)
+
+    def __repr__(self):
+        return 'URLError(%s, %s)' % (repr(self.code), repr(self.msg))
+
+
+class RaisingURLOpener(FancyURLopener):
+    def http_error_default(self, url, fp, errcode, errmsg, headers):
+        raise URLError(url, errcode, errmsg, headers)
 
 
 class ALL(object):
@@ -191,14 +210,14 @@ class URLResource(Resource):
         if os.path.exists(self.destination):
             os.remove(self.destination)  # urlretrieve won't overwrite
         try:
-            urlretrieve(url, self.destination)
+            RaisingURLOpener().retrieve(url, self.destination)
         except IOError as e:
             if VERBOSE:
                 sys.stderr.write('Error fetching {}: {}\n'.format(self.url, e))
             return  # ignore download errors; they will be caught by verify
         if urlparse(self.hash).scheme:
             try:
-                with closing(urlopen(self.hash)) as fp:
+                with closing(RaisingURLOpener().open(self.hash)) as fp:
                     self.hash = fp.read(8*1024).strip()  # hashes should never be that big
             except IOError as e:
                 if VERBOSE:
@@ -284,7 +303,7 @@ class PyPIResource(URLResource):
             r'href=(?:"(?:[^"]*/)?|\'(?:[^\']*/)?)'
             '{}#([^=]+)=(\w+)["\']'.format(re.escape(filename)))
         try:
-            with closing(urlopen(url)) as fp:
+            with closing(RaisingURLOpener().open(url)) as fp:
                 for line in fp:
                     match = re.search(link_re, line)
                     if match:
@@ -333,7 +352,7 @@ class PyPIResource(URLResource):
         if not getattr(cls, '_index', None):
             cls._index = set()
             try:
-                with closing(urlopen(url)) as fp:
+                with closing(RaisingURLOpener().open(url)) as fp:
                     for line in fp:
                         matches = re.findall(r'<a href=(?:"[^"]*"|\'[^\']*\')>([^</]+)', line)
                         for project in matches:

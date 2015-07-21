@@ -265,8 +265,8 @@ class TestURLResource(unittest.TestCase):
     @mock.patch.object(os, 'remove')
     @mock.patch.object(os, 'makedirs')
     @mock.patch.object(os.path, 'exists')
-    @mock.patch.object(backend, 'urlretrieve')
-    def test_fetch(self, murlretrieve, mexists, mmakedirs, mremove):
+    @mock.patch.object(backend.RaisingURLOpener, 'retrieve')
+    def test_fetch(self, mretrieve, mexists, mmakedirs, mremove):
         res = backend.URLResource('name', {
             'url': 'http://example.com/path/fn',
             'hash': 'hash',
@@ -276,31 +276,31 @@ class TestURLResource(unittest.TestCase):
         res.fetch()
         assert not mmakedirs.called
         mremove.assert_called_with('od/fn')
-        murlretrieve.assert_called_with('http://example.com/path/fn', 'od/fn')
+        mretrieve.assert_called_with('http://example.com/path/fn', 'od/fn')
 
         mexists.return_value = False
         res.fetch('http://mirror.com/')
         mmakedirs.assert_called_with('od')
-        murlretrieve.assert_called_with('http://mirror.com/fn', 'od/fn')
+        mretrieve.assert_called_with('http://mirror.com/fn', 'od/fn')
 
-    @mock.patch.object(backend, 'urlopen')
+    @mock.patch.object(backend.RaisingURLOpener, 'open')
     @mock.patch.object(os, 'remove')
     @mock.patch.object(os, 'makedirs')
     @mock.patch.object(os.path, 'exists')
-    @mock.patch.object(backend, 'urlretrieve')
-    def test_fetch_hash_url(self, murlretrieve, mexists, mmakedirs, mremove, murlopen):
+    @mock.patch.object(backend.RaisingURLOpener, 'retrieve')
+    def test_fetch_hash_url(self, mretrieve, mexists, mmakedirs, mremove, mopen):
         res = backend.URLResource('name', {
             'url': 'http://example.com/path/fn',
             'hash': 'http://hash.com/',
             'hash_type': 'hash_type',
         }, 'od')
         mexists.return_value = True
-        murlopen.return_value.read.return_value = 'myhash'
+        mopen.return_value.read.return_value = 'myhash'
         res.fetch()
         assert not mmakedirs.called
         mremove.assert_called_with('od/fn')
-        murlretrieve.assert_called_with('http://example.com/path/fn', 'od/fn')
-        murlopen.assert_called_with('http://hash.com/')
+        mretrieve.assert_called_with('http://example.com/path/fn', 'od/fn')
+        mopen.assert_called_with('http://hash.com/')
         self.assertEqual(res.hash, 'myhash')
 
 
@@ -454,10 +454,10 @@ class TestPyPIResource(unittest.TestCase):
         self.assertEqual(res.hash, '')
         self.assertEqual(res.hash_type, '')
 
-    @mock.patch.object(backend, 'urlopen')
-    def test_get_remote_hash(self, murlopen):
+    @mock.patch.object(backend.RaisingURLOpener, 'open')
+    def test_get_remote_hash(self, mopen):
         res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.1'}, 'od')
-        murlopen.return_value.__iter__.return_value = [
+        mopen.return_value.__iter__.return_value = [
             '<html>',
             '<a href="../../packages/source/j/jujuresources/'
             'jujuresources-0.1.tar.gz#md5=4fdc461dcde13b1e919c17bac6e01464">'
@@ -472,10 +472,10 @@ class TestPyPIResource(unittest.TestCase):
         self.assertEqual(hash, 'deadbeef')
         self.assertEqual(hash_type, 'md5')
 
-    @mock.patch.object(backend, 'urlopen')
-    def test_get_remote_hash_no_match(self, murlopen):
+    @mock.patch.object(backend.RaisingURLOpener, 'open')
+    def test_get_remote_hash_no_match(self, mopen):
         res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, 'od')
-        murlopen.return_value.read.return_value = (
+        mopen.return_value.read.return_value = (
             '<html>'
             '<a href="../../packages/source/j/jujuresources/'
             'jujuresources-0.1.tar.gz#md5=4fdc461dcde13b1e919c17bac6e01464">'
@@ -521,9 +521,9 @@ class TestPyPIResource(unittest.TestCase):
             'od/new-package/new-package-1.0-python2.7.egg.hash_type',
             'hash\n')
 
-    @mock.patch.object(backend, 'urlopen')
-    def test_get_index(self, murlopen):
-        murlopen.return_value.__iter__.return_value = (
+    @mock.patch.object(backend.RaisingURLOpener, 'open')
+    def test_get_index(self, mopen):
+        mopen.return_value.__iter__.return_value = (
             '<html>',
             '<a href="foo">Foo</a>',
             '<a href="bar">bar</a>',
