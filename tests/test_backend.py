@@ -234,7 +234,7 @@ class TestURLResource(unittest.TestCase):
         }, 'od')
         self.assertEqual(res.url, 'http://example.com/fn')
         self.assertEqual(res.filename, 'fn')
-        self.assertEqual(res.destination, 'od/fn')
+        self.assertEqual(res.destination, 'od/name/fn')
         self.assertEqual(res.hash, 'hash')
         self.assertEqual(res.hash_type, 'hash_type')
 
@@ -242,7 +242,7 @@ class TestURLResource(unittest.TestCase):
         res = backend.URLResource('name', {}, 'od')
         self.assertEqual(res.url, '')
         self.assertEqual(res.filename, '')
-        self.assertEqual(res.destination, 'od/')
+        self.assertEqual(res.destination, 'od/name/')
         self.assertEqual(res.hash, '')
         self.assertEqual(res.hash_type, '')
         self.assertEqual(res.output_dir, 'od')
@@ -253,7 +253,7 @@ class TestURLResource(unittest.TestCase):
             'filename': 'myfn'
         }, 'od')
         self.assertEqual(res.filename, 'myfn')
-        self.assertEqual(res.destination, 'od/myfn')
+        self.assertEqual(res.destination, 'od/name/myfn')
 
     def test_init_explicit_destination(self):
         res = backend.URLResource('name', {
@@ -275,32 +275,32 @@ class TestURLResource(unittest.TestCase):
         mexists.return_value = True
         res.fetch()
         assert not mmakedirs.called
-        mremove.assert_called_with('od/fn')
-        mretrieve.assert_called_with('http://example.com/path/fn', 'od/fn')
+        mremove.assert_called_with('od/name/fn')
+        mretrieve.assert_called_with('http://example.com/path/fn', 'od/name/fn')
 
         mexists.return_value = False
         res.fetch('http://mirror.com/')
-        mmakedirs.assert_called_with('od')
-        mretrieve.assert_called_with('http://mirror.com/fn', 'od/fn')
+        mmakedirs.assert_called_with('od/name')
+        mretrieve.assert_called_with('http://mirror.com/fn', 'od/name/fn')
 
-    @mock.patch.object(backend.RaisingURLOpener, 'open')
     @mock.patch.object(os, 'remove')
     @mock.patch.object(os, 'makedirs')
     @mock.patch.object(os.path, 'exists')
     @mock.patch.object(backend.RaisingURLOpener, 'retrieve')
-    def test_fetch_hash_url(self, mretrieve, mexists, mmakedirs, mremove, mopen):
+    def test_fetch_hash_url(self, mretrieve, mexists, mmakedirs, mremove):
         res = backend.URLResource('name', {
             'url': 'http://example.com/path/fn',
             'hash': 'http://hash.com/',
             'hash_type': 'hash_type',
         }, 'od')
         mexists.return_value = True
-        mopen.return_value.read.return_value = 'myhash'
-        res.fetch()
+        mopen = mock.mock_open(read_data='myhash')
+        with mock.patch.object(backend, 'open', mopen, create=True):
+            res.fetch()
         assert not mmakedirs.called
-        mremove.assert_called_with('od/fn')
-        mretrieve.assert_called_with('http://example.com/path/fn', 'od/fn')
-        mopen.assert_called_with('http://hash.com/')
+        mremove.assert_called_with('od/name/fn')
+        mretrieve.assert_called_with('http://example.com/path/fn', 'od/name/fn')
+        mopen.assert_called_with('od/name/fn.hash_type')
         self.assertEqual(res.hash, 'myhash')
 
 

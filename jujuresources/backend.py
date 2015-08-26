@@ -196,7 +196,7 @@ class URLResource(Resource):
         self.filename = definition.get(
             'filename', os.path.basename(urlparse(self.url).path))
         self.destination = definition.get(
-            'destination', os.path.join(self.output_dir, self.filename))
+            'destination', os.path.join(self.output_dir, name, self.filename))
 
     def fetch(self, mirror_url=None):
         if mirror_url:
@@ -205,6 +205,19 @@ class URLResource(Resource):
             url = self.url
         if url.startswith('./'):
             url = url[2:]  # urlretrieve complains about this for some reason
+
+        if urlparse(self.hash).scheme:
+            hash_url = urljoin(mirror_url, self.hash) if mirror_url else self.hash
+            hash_dst = '{}.{}'.format(self.destination, self.hash_type)
+            try:
+                RaisingURLOpener().retrieve(hash_url, hash_dst)
+                with open(hash_dst) as fp:
+                    self.hash = fp.read(8*1024).strip()  # hashes should never be that big
+            except IOError as e:
+                if VERBOSE:
+                    sys.stderr.write('Error fetching hash {}: {}\n'.format(hash_url, e))
+                return  # ignore download errors; they will be caught by verify
+
         if not os.path.exists(os.path.dirname(self.destination)):
             os.makedirs(os.path.dirname(self.destination))
         if os.path.exists(self.destination):
@@ -215,14 +228,6 @@ class URLResource(Resource):
             if VERBOSE:
                 sys.stderr.write('Error fetching {}: {}\n'.format(self.url, e))
             return  # ignore download errors; they will be caught by verify
-        if urlparse(self.hash).scheme:
-            try:
-                with closing(RaisingURLOpener().open(self.hash)) as fp:
-                    self.hash = fp.read(8*1024).strip()  # hashes should never be that big
-            except IOError as e:
-                if VERBOSE:
-                    sys.stderr.write('Error fetching hash {}: {}\n'.format(self.url, e))
-                return  # ignore download errors; they will be caught by verify
 
 
 class PyPIResource(URLResource):

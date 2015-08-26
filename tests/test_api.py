@@ -55,7 +55,7 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(resources['foo'].hash, 'deadbeef1')
         self.assertEqual(resources['foo'].hash_type, 'nonce')
         self.assertEqual(resources['foo'].filename, 'foo.tgz')
-        self.assertEqual(resources['foo'].destination, 'resources/foo.tgz')
+        self.assertEqual(resources['foo'].destination, 'resources/foo/foo.tgz')
 
         self.assertEqual(resources['bar'].url, 'http://bar.com/bar.tgz')
         self.assertEqual(resources['bar'].hash, 'deadbeef2')
@@ -67,14 +67,14 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(resources['qux'].hash, 'deadbeef3')
         self.assertEqual(resources['qux'].hash_type, 'nonce')
         self.assertEqual(resources['qux'].filename, 'qux.tgz')
-        self.assertEqual(resources['qux'].destination, 'resources/qux.tgz')
+        self.assertEqual(resources['qux'].destination, 'resources/qux/qux.tgz')
 
     def test_load_options(self):
         resfile = os.path.join(self.test_data, 'res-options.yaml')
         resources = jujuresources._load(resfile)
-        self.assertEqual(resources['foo'].destination, 'custom/foo.tgz')
+        self.assertEqual(resources['foo'].destination, 'custom/foo/foo.tgz')
         resources = jujuresources._load(resfile, 'different')
-        self.assertEqual(resources['foo'].destination, 'different/foo.tgz')
+        self.assertEqual(resources['foo'].destination, 'different/foo/foo.tgz')
 
     def test_invalid(self):
         self.assertItemsEqual(jujuresources._invalid(self.resources, 'valid'), [])
