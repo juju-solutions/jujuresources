@@ -279,9 +279,9 @@ class TestURLResource(unittest.TestCase):
         mretrieve.assert_called_with('http://example.com/path/fn', 'od/name/fn')
 
         mexists.return_value = False
-        res.fetch('http://mirror.com/')
+        res.fetch('http://mirror.com/cache/')
         mmakedirs.assert_called_with('od/name')
-        mretrieve.assert_called_with('http://mirror.com/fn', 'od/name/fn')
+        mretrieve.assert_called_with('http://mirror.com/cache/name/fn', 'od/name/fn')
 
     @mock.patch.object(os, 'remove')
     @mock.patch.object(os, 'makedirs')
@@ -290,7 +290,7 @@ class TestURLResource(unittest.TestCase):
     def test_fetch_hash_url(self, mretrieve, mexists, mmakedirs, mremove):
         res = backend.URLResource('name', {
             'url': 'http://example.com/path/fn',
-            'hash': 'http://hash.com/',
+            'hash': 'http://example.com/path/fn.hash',
             'hash_type': 'hash_type',
         }, 'od')
         mexists.return_value = True
@@ -299,9 +299,21 @@ class TestURLResource(unittest.TestCase):
             res.fetch()
         assert not mmakedirs.called
         mremove.assert_called_with('od/name/fn')
-        mretrieve.assert_called_with('http://example.com/path/fn', 'od/name/fn')
-        mopen.assert_called_with('od/name/fn.hash_type')
+        mretrieve.assert_any_call('http://example.com/path/fn', 'od/name/fn')
+        mretrieve.assert_any_call('http://example.com/path/fn.hash', 'od/name/fn.hash')
+        mopen.assert_called_with('od/name/fn.hash')
         self.assertEqual(res.hash, 'myhash')
+
+        res = backend.URLResource('name', {
+            'url': 'http://example.com/path/fn',
+            'hash': 'http://example.com/path/fn.hash',
+            'hash_type': 'hash_type',
+        }, 'od')
+        mretrieve.reset_mock()
+        with mock.patch.object(backend, 'open', mopen, create=True):
+            res.fetch('http://mirror.com/cache/')
+        mretrieve.assert_any_call('http://mirror.com/cache/name/fn', 'od/name/fn')
+        mretrieve.assert_any_call('http://mirror.com/cache/name/fn.hash', 'od/name/fn.hash')
 
 
 class TestPyPIResource(unittest.TestCase):

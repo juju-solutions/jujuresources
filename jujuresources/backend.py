@@ -200,15 +200,17 @@ class URLResource(Resource):
 
     def fetch(self, mirror_url=None):
         if mirror_url:
-            url = urljoin(mirror_url, self.filename)
+            url = urljoin(mirror_url, os.path.join(self.name, self.filename))
         else:
             url = self.url
         if url.startswith('./'):
             url = url[2:]  # urlretrieve complains about this for some reason
 
         if urlparse(self.hash).scheme:
-            hash_url = urljoin(mirror_url, self.hash) if mirror_url else self.hash
-            hash_dst = '{}.{}'.format(self.destination, self.hash_type)
+            hash_url_parts = urlparse(self.hash)
+            hash_filename = os.path.basename(hash_url_parts.path)
+            hash_url = urljoin(mirror_url, os.path.join(self.name, hash_filename)) if mirror_url else self.hash
+            hash_dst = os.path.join(os.path.dirname(self.destination), hash_filename)
             try:
                 RaisingURLOpener().retrieve(hash_url, hash_dst)
                 with open(hash_dst) as fp:
