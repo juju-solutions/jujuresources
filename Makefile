@@ -1,8 +1,8 @@
 PROJECT=jujuresources
-PYTHON := /usr/bin/env python
 SUITE=unstable
 TESTS=tests/
 
+.PHONY: all
 all:
 	@echo "make test"
 	@echo "make source - Create source package"
@@ -11,6 +11,7 @@ all:
 	@echo "make docs - Build html documentation"
 	@echo "make release - Build and upload package and docs to PyPI"
 
+.PHONY: source
 source: setup.py
 	scripts/update-revno
 	python setup.py sdist
@@ -22,54 +23,66 @@ clean:
 	rm -rf dist/*
 	rm -rf .venv
 	rm -rf .venv3
+	rm -rf docs/_build
 
 .PHONY: docclean
 docclean:
 	-rm -rf docs/_build
 
+.PHONY: userinstall
 userinstall:
 	scripts/update-revno
 	python setup.py install --user
 
 .venv:
-	- [ -z "`dpkg -l | grep python-virtualenv`" ] && sudo apt-get install -y python-virtualenv
+	dpkg -l | grep python-virtualenv || sudo apt-get install -y python-virtualenv
 	virtualenv .venv
 	.venv/bin/pip install -IUr test_requirements.txt
 
 .venv3:
-	- [ -z "`dpkg -l | grep python-virtualenv`" ] && sudo apt-get install -y python-virtualenv
+	dpkg -l | grep python-virtualenv || sudo apt-get install -y python-virtualenv
 	virtualenv .venv3 --python=python3
 	.venv3/bin/pip install -IUr test_requirements.txt
 
 # Note we don't even attempt to run tests if lint isn't passing.
+.PHONY: test
 test: lint test2 test3
 
+.PHONY: test2
 test2:
 	@echo Starting Py2 tests...
 	.venv/bin/nosetests -s --nologcapture tests/
 
+.PHONY: test3
 test3:
 	@echo Starting Py3 tests...
 	.venv3/bin/nosetests -s --nologcapture tests/
 
+.PHONY: ftest
 ftest: lint
 	@echo Starting fast tests...
 	.venv/bin/nosetests --attr '!slow' --nologcapture tests/
 	.venv3/bin/nosetests --attr '!slow' --nologcapture tests/
 
+.PHONY: lint
 lint: .venv .venv3
 	@echo Checking for Python syntax...
-	@flake8 --max-line-length=120 $(PROJECT) $(TESTS) \
+	.venv/bin/flake8 --max-line-length=120 $(PROJECT) $(TESTS) \
 	    && echo Py2 OK
-	@python3 -m flake8.run --max-line-length=120 $(PROJECT) $(TESTS) \
+	.venv3/bin/flake8 --max-line-length=120 $(PROJECT) $(TESTS) \
 	    && echo Py3 OK
 
-docs:
-	- [ -z "`dpkg -l | grep python-sphinx`" ] && sudo apt-get install python-sphinx -y
-	- [ -z "`dpkg -l | grep python-pip`" ] && sudo apt-get install python-pip -y
-	- [ -z "`pip list | grep -i sphinx-pypi-upload`" ] && sudo pip install sphinx-pypi-upload
-	cd docs && make html && cd -
 .PHONY: docs
+docs: .venv
+	- [ -z "`.venv/bin/pip list | grep -i 'sphinx '`" ] && .venv/bin/pip install sphinx
+	- [ -z "`.venv/bin/pip list | grep -i sphinx-pypi-upload`" ] && .venv/bin/pip install sphinx-pypi-upload
+	# If sphinx is installed on the system, pip installing into the venv does not
+	# put the binaries into .venv/bin. Test for and use the .venv binary if it's
+	# there; otherwise, we probably have a system sphinx in /usr/bin, so use that.
+	SPHINX=$$(test -x .venv/bin/sphinx-build && echo \"../.venv/bin/sphinx-build\" || echo \"../.venv/bin/python /usr/bin/sphinx-build\"); \
+	    cd docs && make html SPHINXBUILD=$$SPHINX && cd -
 
-release: docs
-	$(PYTHON) setup.py register sdist upload upload_docs
+.PHONY: release
+release: .venv docs
+	scripts/update-revno
+	.venv/bin/python setup.py register sdist upload upload_docs
