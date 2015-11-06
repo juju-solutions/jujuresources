@@ -265,8 +265,9 @@ class TestURLResource(unittest.TestCase):
     @mock.patch.object(os, 'remove')
     @mock.patch.object(os, 'makedirs')
     @mock.patch.object(os.path, 'exists')
-    @mock.patch.object(backend.RaisingURLOpener, 'retrieve')
-    def test_fetch(self, mretrieve, mexists, mmakedirs, mremove):
+    @mock.patch.object(backend, 'open')
+    @mock.patch.object(backend, 'urlopen')
+    def test_fetch(self, murlopen, mopen, mexists, mmakedirs, mremove):
         res = backend.URLResource('name', {
             'url': 'http://example.com/path/fn',
             'hash': 'hash',
@@ -276,18 +277,20 @@ class TestURLResource(unittest.TestCase):
         res.fetch()
         assert not mmakedirs.called
         mremove.assert_called_with('od/name/fn')
-        mretrieve.assert_called_with('http://example.com/path/fn', 'od/name/fn')
+        murlopen.assert_called_with('http://example.com/path/fn')
+        mopen.assert_called_with('od/name/fn', 'w+')
 
         mexists.return_value = False
         res.fetch('http://mirror.com/cache/')
         mmakedirs.assert_called_with('od/name')
-        mretrieve.assert_called_with('http://mirror.com/cache/name/fn', 'od/name/fn')
+        murlopen.assert_called_with('http://mirror.com/cache/name/fn')
+        mopen.assert_called_with('od/name/fn', 'w+')
 
     @mock.patch.object(os, 'remove')
     @mock.patch.object(os, 'makedirs')
     @mock.patch.object(os.path, 'exists')
-    @mock.patch.object(backend.RaisingURLOpener, 'retrieve')
-    def test_fetch_hash_url(self, mretrieve, mexists, mmakedirs, mremove):
+    @mock.patch.object(backend, 'urlopen')
+    def test_fetch_hash_url(self, murlopen, mexists, mmakedirs, mremove):
         res = backend.URLResource('name', {
             'url': 'http://example.com/path/fn',
             'hash': 'http://example.com/path/fn.hash',
@@ -299,9 +302,10 @@ class TestURLResource(unittest.TestCase):
             res.fetch()
         assert not mmakedirs.called
         mremove.assert_called_with('od/name/fn')
-        mretrieve.assert_any_call('http://example.com/path/fn', 'od/name/fn')
-        mretrieve.assert_any_call('http://example.com/path/fn.hash', 'od/name/fn.hash')
-        mopen.assert_called_with('od/name/fn.hash')
+        murlopen.assert_any_call('http://example.com/path/fn')
+        mopen.assert_any_call('od/name/fn', 'w+')
+        murlopen.assert_any_call('http://example.com/path/fn.hash')
+        mopen.assert_any_call('od/name/fn.hash', 'w+')
         self.assertEqual(res.hash, 'myhash')
 
         res = backend.URLResource('name', {
@@ -309,11 +313,13 @@ class TestURLResource(unittest.TestCase):
             'hash': 'http://example.com/path/fn.hash',
             'hash_type': 'hash_type',
         }, 'od')
-        mretrieve.reset_mock()
+        murlopen.reset_mock()
         with mock.patch.object(backend, 'open', mopen, create=True):
             res.fetch('http://mirror.com/cache/')
-        mretrieve.assert_any_call('http://mirror.com/cache/name/fn', 'od/name/fn')
-        mretrieve.assert_any_call('http://mirror.com/cache/name/fn.hash', 'od/name/fn.hash')
+        murlopen.assert_any_call('http://mirror.com/cache/name/fn')
+        mopen.assert_any_call('od/name/fn', 'w+')
+        murlopen.assert_any_call('http://mirror.com/cache/name/fn.hash')
+        mopen.assert_any_call('od/name/fn.hash', 'w+')
 
 
 class TestPyPIResource(unittest.TestCase):
@@ -466,10 +472,10 @@ class TestPyPIResource(unittest.TestCase):
         self.assertEqual(res.hash, '')
         self.assertEqual(res.hash_type, '')
 
-    @mock.patch.object(backend.RaisingURLOpener, 'open')
-    def test_get_remote_hash(self, mopen):
+    @mock.patch.object(backend, 'urlopen')
+    def test_get_remote_hash(self, murlopen):
         res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.1'}, 'od')
-        mopen.return_value.__iter__.return_value = [
+        murlopen.return_value.__iter__.return_value = [
             '<html>',
             '<a href="../../packages/source/j/jujuresources/'
             'jujuresources-0.1.tar.gz#md5=4fdc461dcde13b1e919c17bac6e01464">'
@@ -484,10 +490,10 @@ class TestPyPIResource(unittest.TestCase):
         self.assertEqual(hash, 'deadbeef')
         self.assertEqual(hash_type, 'md5')
 
-    @mock.patch.object(backend.RaisingURLOpener, 'open')
-    def test_get_remote_hash_no_match(self, mopen):
+    @mock.patch.object(backend, 'urlopen')
+    def test_get_remote_hash_no_match(self, murlopen):
         res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.2'}, 'od')
-        mopen.return_value.read.return_value = (
+        murlopen.return_value.read.return_value = (
             '<html>'
             '<a href="../../packages/source/j/jujuresources/'
             'jujuresources-0.1.tar.gz#md5=4fdc461dcde13b1e919c17bac6e01464">'
@@ -533,9 +539,9 @@ class TestPyPIResource(unittest.TestCase):
             'od/new-package/new-package-1.0-python2.7.egg.hash_type',
             'hash\n')
 
-    @mock.patch.object(backend.RaisingURLOpener, 'open')
-    def test_get_index(self, mopen):
-        mopen.return_value.__iter__.return_value = (
+    @mock.patch.object(backend, 'urlopen')
+    def test_get_index(self, murlopen):
+        murlopen.return_value.__iter__.return_value = (
             '<html>',
             '<a href="foo">Foo</a>',
             '<a href="bar">bar</a>',

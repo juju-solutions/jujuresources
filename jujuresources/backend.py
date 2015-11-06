@@ -7,16 +7,17 @@ import subprocess
 import sys
 import tarfile
 import zipfile
-from urllib2 import urlopen
 
 try:
     # Python 3
     from urllib.parse import urlparse, urljoin, parse_qs
     from hashlib import algorithms_available as hashlib_algs
+    from urllib.request import urlopen
 except ImportError:
     # Python 2
     from urlparse import urlparse, urljoin, parse_qs
     from hashlib import algorithms as hashlib_algs
+    from urllib2 import urlopen
 
 
 class ALL(object):
@@ -272,7 +273,7 @@ class PyPIResource(URLResource):
                 if os.path.isfile(hash_file):
                     self.filename = filename
                     self.destination = fullname
-                    self.hash_type = hash_type
+                    self.hash_type = hash_type.lower()
                     with open(hash_file) as fp:
                         self.hash = fp.readline().strip()
                     return
