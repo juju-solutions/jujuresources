@@ -49,7 +49,11 @@ docs: test
 	SPHINX=$$(test -x .tox/docs/bin/sphinx-build && echo \"../.tox/docs/bin/sphinx-build\" || echo \"../.tox/py27/bin/python /usr/bin/sphinx-build\"); \
 	    cd docs && make html SPHINXBUILD=$$SPHINX && cd -
 
+.PHONY: docrelease
+docrelease: test docs
+	.tox/docs/bin/python setup.py register upload_docs
+
 .PHONY: release
 release: test docs
 	scripts/update-revno
-	.tox/py27/bin/python setup.py register sdist upload upload_docs
+	.tox/docs/bin/python setup.py register sdist upload upload_docs
