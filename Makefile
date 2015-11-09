@@ -41,13 +41,12 @@ lint:
 	tox -e lint
 
 .PHONY: docs
-docs:
-	- [ -z "`.venv/bin/pip list | grep -i 'sphinx '`" ] && .venv/bin/pip install sphinx
-	- [ -z "`.venv/bin/pip list | grep -i sphinx-pypi-upload`" ] && .venv/bin/pip install sphinx-pypi-upload
-	# If sphinx is installed on the system, pip installing into the venv does not
-	# put the binaries into .venv/bin. Test for and use the .venv binary if it's
-	# there; otherwise, we probably have a system sphinx in /usr/bin, so use that.
-	SPHINX=$$(test -x .venv/bin/sphinx-build && echo \"../.venv/bin/sphinx-build\" || echo \"../.venv/bin/python /usr/bin/sphinx-build\"); \
+docs: test
+	# If sphinx is installed on the system, pip installing into the venv may not
+	# always put the binaries into the right place. Test for and use the venv
+	# binary if it's there; otherwise, we probably have a system sphinx in
+	# /usr/bin, so use that. (This may no longer be needed with move to tox)
+	SPHINX=$$(test -x .tox/docs/bin/sphinx-build && echo \"../.tox/docs/bin/sphinx-build\" || echo \"../.tox/py27/bin/python /usr/bin/sphinx-build\"); \
 	    cd docs && make html SPHINXBUILD=$$SPHINX && cd -
 
 .PHONY: release

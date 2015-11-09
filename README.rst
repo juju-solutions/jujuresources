@@ -1,7 +1,7 @@
-Juju Resources
---------------
+Juju Resources |badge|
+-----------------------------------------------------------------
 
-.. image:: https://travis-ci.org/juju-solutions/jujuresources.svg
+.. |badge| image:: https://travis-ci.org/juju-solutions/jujuresources.svg
     :target: https://travis-ci.org/juju-solutions/jujuresources
 
 Juju Resources provides helpers for charms to load binary resources from
