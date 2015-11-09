@@ -3,7 +3,7 @@ jujuresources.egg-info/
 build/
 dist/
 docs/_build
-.venv/
-.venv3/
+.tox/
+.coverage
 coverage.xml
 jujuresources/version.py
