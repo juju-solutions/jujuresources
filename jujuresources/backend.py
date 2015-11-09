@@ -10,35 +10,14 @@ import zipfile
 
 try:
     # Python 3
-    from urllib.request import FancyURLopener
     from urllib.parse import urlparse, urljoin, parse_qs
     from hashlib import algorithms_available as hashlib_algs
+    from urllib.request import urlopen
 except ImportError:
     # Python 2
-    from urllib import FancyURLopener
     from urlparse import urlparse, urljoin, parse_qs
     from hashlib import algorithms as hashlib_algs
-
-VERBOSE = False
-
-
-class URLError(IOError):
-    def __init__(self, url, code, msg, headers):
-        self.url = url
-        self.code = code
-        self.msg = msg
-        self.headers = headers
-
-    def __str__(self):
-        return '%s (%s)' % (self.code, self.msg)
-
-    def __repr__(self):
-        return 'URLError(%s, %s)' % (repr(self.code), repr(self.msg))
-
-
-class RaisingURLOpener(FancyURLopener):
-    def http_error_default(self, url, fp, errcode, errmsg, headers):
-        raise URLError(url, errcode, errmsg, headers)
+    from urllib2 import urlopen
 
 
 class ALL(object):
@@ -80,7 +59,6 @@ class ResourceContainer(dict):
 class Resource(object):
     """
     Base class for a Resource.
-
     Handles local file resources (with explicit ``filename`` or ``destination``).
     """
     @classmethod
@@ -165,7 +143,6 @@ class Resource(object):
     def _is_bugged_tarfile(self):
         """
         Check for tar file that tarfile library mistakenly reports as invalid.
-
         Happens with tar files created on FAT systems.  See:
         http://stackoverflow.com/questions/25552162/tarfile-readerror-file-could-not-be-opened-successfully
         """
@@ -178,7 +155,6 @@ class Resource(object):
     def _handle_bugged_tarfile(self, destination, skip_top_level):
         """
         Handle tar file that tarfile library mistakenly reports as invalid.
-
         Happens with tar files created on FAT systems.  See:
         http://stackoverflow.com/questions/25552162/tarfile-readerror-file-could-not-be-opened-successfully
         """
@@ -212,12 +188,12 @@ class URLResource(Resource):
             hash_url = urljoin(mirror_url, os.path.join(self.name, hash_filename)) if mirror_url else self.hash
             hash_dst = os.path.join(os.path.dirname(self.destination), hash_filename)
             try:
-                RaisingURLOpener().retrieve(hash_url, hash_dst)
+                with closing(urlopen(hash_url)) as hash_in, open(hash_dst, 'w+') as hash_out:
+                    hash_out.write(hash_in.read())
                 with open(hash_dst) as fp:
                     self.hash = fp.read(8*1024).strip()  # hashes should never be that big
             except IOError as e:
-                if VERBOSE:
-                    sys.stderr.write('Error fetching hash {}: {}\n'.format(hash_url, e))
+                sys.stderr.write('Error fetching hash {}: {}\n'.format(hash_url, e))
                 return  # ignore download errors; they will be caught by verify
 
         if not os.path.exists(os.path.dirname(self.destination)):
@@ -225,10 +201,10 @@ class URLResource(Resource):
         if os.path.exists(self.destination):
             os.remove(self.destination)  # urlretrieve won't overwrite
         try:
-            RaisingURLOpener().retrieve(url, self.destination)
+            with closing(urlopen(url)) as res_in, open(self.destination, 'w+') as res_out:
+                res_out.write(res_in.read())
         except IOError as e:
-            if VERBOSE:
-                sys.stderr.write('Error fetching {}: {}\n'.format(self.url, e))
+            sys.stderr.write('Error fetching {}: {}\n'.format(self.url, e))
             return  # ignore download errors; they will be caught by verify
 
 
@@ -262,8 +238,7 @@ class PyPIResource(URLResource):
         try:
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:  # noqa
-            if VERBOSE:
-                sys.stderr.write('Error fetching {}:\n{}\n'.format(self.name, e.output))
+            sys.stderr.write('Error fetching {}:\n{}\n'.format(self.name, e.output))
             return
         if not mirror_url:
             mirror_url = 'https://pypi.python.org/simple'
@@ -298,7 +273,7 @@ class PyPIResource(URLResource):
                 if os.path.isfile(hash_file):
                     self.filename = filename
                     self.destination = fullname
-                    self.hash_type = hash_type
+                    self.hash_type = hash_type.lower()
                     with open(hash_file) as fp:
                         self.hash = fp.readline().strip()
                     return
@@ -310,17 +285,16 @@ class PyPIResource(URLResource):
             r'href=(?:"(?:[^"]*/)?|\'(?:[^\']*/)?)'
             '{}#([^=]+)=(\w+)["\']'.format(re.escape(filename)))
         try:
-            with closing(RaisingURLOpener().open(url)) as fp:
+            with closing(urlopen(url)) as fp:
                 for line in fp:
                     match = re.search(link_re, line)
                     if match:
                         return match.groups()
         except IOError as e:
-            if VERBOSE:
-                sys.stderr.write('Error fetching hash {}: {}\n'.format(url, e))
+            sys.stderr.write('Error fetching hash {}: {}\n'.format(url, e))
             return ('', '')
-        if VERBOSE:
-            sys.stderr.write('Hash not found for {}\n'.format(filename))
+
+        sys.stderr.write('Hash not found for {}\n'.format(filename))
         return ('', '')
 
     def process_dependency(self, filename, mirror_url):
@@ -359,7 +333,7 @@ class PyPIResource(URLResource):
         if not getattr(cls, '_index', None):
             cls._index = set()
             try:
-                with closing(RaisingURLOpener().open(url)) as fp:
+                with closing(urlopen(url)) as fp:
                     for line in fp:
                         matches = re.findall(r'<a href=(?:"[^"]*"|\'[^\']*\')>([^</]+)', line)
                         for project in matches:
