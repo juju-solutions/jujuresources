@@ -265,7 +265,7 @@ class TestURLResource(unittest.TestCase):
     @mock.patch.object(os, 'remove')
     @mock.patch.object(os, 'makedirs')
     @mock.patch.object(os.path, 'exists')
-    @mock.patch.object(backend, 'open')
+    @mock.patch.object(backend, 'open', create=True)
     @mock.patch.object(backend, 'urlopen')
     def test_fetch(self, murlopen, mopen, mexists, mmakedirs, mremove):
         res = backend.URLResource('name', {
