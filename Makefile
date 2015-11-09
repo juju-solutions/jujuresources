@@ -1,6 +1,5 @@
 PROJECT=jujuresources
 SUITE=unstable
-TESTS=tests/
 
 .PHONY: all
 all:
@@ -21,8 +20,7 @@ clean:
 	-python setup.py clean
 	find . -name '*.pyc' -delete
 	rm -rf dist/*
-	rm -rf .venv
-	rm -rf .venv3
+	rm -rf .tox
 	rm -rf docs/_build
 
 .PHONY: docclean
@@ -34,46 +32,16 @@ userinstall:
 	scripts/update-revno
 	python setup.py install --user
 
-.venv:
-	dpkg -l | grep python-virtualenv || sudo apt-get install -y python-virtualenv
-	virtualenv .venv
-	.venv/bin/pip install -IUr test_requirements.txt
-
-.venv3:
-	dpkg -l | grep python-virtualenv || sudo apt-get install -y python-virtualenv
-	virtualenv .venv3 --python=python3
-	.venv3/bin/pip install -IUr test_requirements.txt
-
-# Note we don't even attempt to run tests if lint isn't passing.
 .PHONY: test
-test: lint test2 test3
-
-.PHONY: test2
-test2:
-	@echo Starting Py2 tests...
-	.venv/bin/nosetests -s --nologcapture tests/
-
-.PHONY: test3
-test3:
-	@echo Starting Py3 tests...
-	.venv3/bin/nosetests -s --nologcapture tests/
-
-.PHONY: ftest
-ftest: lint
-	@echo Starting fast tests...
-	.venv/bin/nosetests --attr '!slow' --nologcapture tests/
-	.venv3/bin/nosetests --attr '!slow' --nologcapture tests/
+test:
+	tox
 
 .PHONY: lint
-lint: .venv .venv3
-	@echo Checking for Python syntax...
-	.venv/bin/flake8 --max-line-length=120 $(PROJECT) $(TESTS) \
-	    && echo Py2 OK
-	.venv3/bin/flake8 --max-line-length=120 $(PROJECT) $(TESTS) \
-	    && echo Py3 OK
+lint:
+	tox -e lint
 
 .PHONY: docs
-docs: .venv
+docs:
 	- [ -z "`.venv/bin/pip list | grep -i 'sphinx '`" ] && .venv/bin/pip install sphinx
 	- [ -z "`.venv/bin/pip list | grep -i sphinx-pypi-upload`" ] && .venv/bin/pip install sphinx-pypi-upload
 	# If sphinx is installed on the system, pip installing into the venv does not
@@ -83,6 +51,6 @@ docs: .venv
 	    cd docs && make html SPHINXBUILD=$$SPHINX && cd -
 
 .PHONY: release
-release: .venv docs
+release: test docs
 	scripts/update-revno
-	.venv/bin/python setup.py register sdist upload upload_docs
+	.tox/py27/bin/python setup.py register sdist upload upload_docs
