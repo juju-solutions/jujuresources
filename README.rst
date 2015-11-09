@@ -1,3 +1,9 @@
+Juju Resources
+--------------
+
+.. image:: https://travis-ci.org/juju-solutions/jujuresources.svg
+    :target: https://travis-ci.org/juju-solutions/jujuresources
+
 Juju Resources provides helpers for charms to load binary resources from
 external sources, as well as tools for creating mirrors of external resources
 for network-restricted deployments.
