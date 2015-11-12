@@ -213,12 +213,18 @@ class PyPIResource(URLResource):
         super(PyPIResource, self).__init__(name, definition, output_dir)
         self.spec = definition.get('pypi', '')
         urlspec = urlparse(self.spec)
-        if urlspec.scheme and '+' not in urlspec.scheme:
-            self.url = self.spec
+        if urlspec.scheme:
             self.package_name = parse_qs(re.sub(r'^#', '', urlspec.fragment)).get('egg', [''])[0]
-            self.destination_dir = self.output_dir
-            self.filename = os.path.basename(urlspec.path)
-            self.destination = os.path.join(self.destination_dir, self.filename)
+            if '+' in urlspec.scheme:
+                self.url = ''
+                self.destination_dir = os.path.join(self.output_dir, self.package_name)
+                self.filename = ''
+                self.destination = ''
+            else:
+                self.url = self.spec
+                self.destination_dir = self.output_dir
+                self.filename = os.path.basename(urlspec.path)
+                self.destination = os.path.join(self.destination_dir, self.filename)
         else:
             self.url = ''
             self.package_name = re.sub(r'[<>=].*', '', self.spec)
