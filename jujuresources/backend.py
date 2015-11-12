@@ -82,15 +82,18 @@ class Resource(object):
         self.spec = self.destination
         self.hash = definition.get('hash', '')
         self.hash_type = definition.get('hash_type', '')
+        self.skip_hash = definition.get('skip_hash', False)
         self.output_dir = output_dir
 
     def fetch(self, mirror_url=None):
         return
 
     def verify(self):
-        if self.hash_type not in hashlib_algs:
-            return False
         if not os.path.isfile(self.destination):
+            return False
+        if self.skip_hash:
+            return True  # for testing use only
+        if self.hash_type not in hashlib_algs:
             return False
         with open(self.destination, 'rb') as fp:
             hash = hashlib.new(self.hash_type)
@@ -268,6 +271,8 @@ class PyPIResource(URLResource):
         return super(PyPIResource, self).verify()
 
     def get_local_hash(self):
+        if self.skip_hash:
+            return
         if self.url:
             return
         if not os.path.isdir(self.destination_dir):
@@ -285,6 +290,8 @@ class PyPIResource(URLResource):
                     return
 
     def get_remote_hash(self, filename, mirror_url):
+        if self.skip_hash:
+            return ('', '')
         package_name = self._package_name_from_filename(filename, mirror_url)
         url = urljoin(mirror_url, package_name)
         link_re = (
