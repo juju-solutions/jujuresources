@@ -213,7 +213,7 @@ class PyPIResource(URLResource):
         super(PyPIResource, self).__init__(name, definition, output_dir)
         self.spec = definition.get('pypi', '')
         urlspec = urlparse(self.spec)
-        if urlspec.scheme:
+        if urlspec.scheme and '+' not in urlspec.scheme:
             self.url = self.spec
             self.package_name = parse_qs(re.sub(r'^#', '', urlspec.fragment)).get('egg', [''])[0]
             self.destination_dir = self.output_dir
