@@ -219,6 +219,10 @@ class PyPIResource(URLResource):
         if urlspec.scheme:
             self.package_name = parse_qs(re.sub(r'^#', '', urlspec.fragment)).get('egg', [''])[0]
             if '+' in urlspec.scheme:
+                # git+https:// URLs are useful for testing and development
+                # but need to be handled more like package names than URLs
+                # (NB: You'll probably also want to use skip_hash: true because the
+                # hashes of the artifacts created from repos tend to always change.)
                 self.url = ''
                 self.destination_dir = os.path.join(self.output_dir, self.package_name)
                 self.filename = ''
