@@ -82,15 +82,18 @@ class Resource(object):
         self.spec = self.destination
         self.hash = definition.get('hash', '')
         self.hash_type = definition.get('hash_type', '')
+        self.skip_hash = definition.get('skip_hash', False)
         self.output_dir = output_dir
 
     def fetch(self, mirror_url=None):
         return
 
     def verify(self):
-        if self.hash_type not in hashlib_algs:
-            return False
         if not os.path.isfile(self.destination):
+            return False
+        if self.skip_hash:
+            return True  # for testing use only
+        if self.hash_type not in hashlib_algs:
             return False
         with open(self.destination, 'rb') as fp:
             hash = hashlib.new(self.hash_type)
@@ -214,11 +217,21 @@ class PyPIResource(URLResource):
         self.spec = definition.get('pypi', '')
         urlspec = urlparse(self.spec)
         if urlspec.scheme:
-            self.url = self.spec
             self.package_name = parse_qs(re.sub(r'^#', '', urlspec.fragment)).get('egg', [''])[0]
-            self.destination_dir = self.output_dir
-            self.filename = os.path.basename(urlspec.path)
-            self.destination = os.path.join(self.destination_dir, self.filename)
+            if '+' in urlspec.scheme:
+                # git+https:// URLs are useful for testing and development
+                # but need to be handled more like package names than URLs
+                # (NB: You'll probably also want to use skip_hash: true because the
+                # hashes of the artifacts created from repos tend to always change.)
+                self.url = ''
+                self.destination_dir = os.path.join(self.output_dir, self.package_name)
+                self.filename = ''
+                self.destination = ''
+            else:
+                self.url = self.spec
+                self.destination_dir = self.output_dir
+                self.filename = os.path.basename(urlspec.path)
+                self.destination = os.path.join(self.destination_dir, self.filename)
         else:
             self.url = ''
             self.package_name = re.sub(r'[<>=].*', '', self.spec)
@@ -262,6 +275,8 @@ class PyPIResource(URLResource):
         return super(PyPIResource, self).verify()
 
     def get_local_hash(self):
+        if self.skip_hash:
+            return
         if self.url:
             return
         if not os.path.isdir(self.destination_dir):
@@ -279,6 +294,8 @@ class PyPIResource(URLResource):
                     return
 
     def get_remote_hash(self, filename, mirror_url):
+        if self.skip_hash:
+            return ('', '')
         package_name = self._package_name_from_filename(filename, mirror_url)
         url = urljoin(mirror_url, package_name)
         link_re = (
