@@ -1,5 +1,6 @@
 PROJECT=jujuresources
 SUITE=unstable
+VERSION=$(shell cat VERSION)
 
 .PHONY: all
 all:
@@ -56,4 +57,6 @@ docrelease: test docs
 .PHONY: release
 release: test docs
 	scripts/update-revno
+	git tag release-${VERSION}
+	git push --tags
 	.tox/docs/bin/python setup.py register sdist upload upload_docs
