@@ -304,7 +304,7 @@ class PyPIResource(URLResource):
         try:
             with closing(urlopen(url)) as fp:
                 for line in fp:
-                    match = re.search(link_re, line)
+                    match = re.search(link_re, line.decode('utf-8'))
                     if match:
                         return match.groups()
         except IOError as e:
@@ -352,7 +352,7 @@ class PyPIResource(URLResource):
             try:
                 with closing(urlopen(url)) as fp:
                     for line in fp:
-                        matches = re.findall(r'<a href=(?:"[^"]*"|\'[^\']*\')>([^</]+)', line)
+                        matches = re.findall(r'<a href=(?:"[^"]*"|\'[^\']*\')>([^</]+)', line.decode('utf-8'))
                         for project in matches:
                             cls._index.add(project)
             except IOError as e:
