@@ -476,16 +476,16 @@ class TestPyPIResource(unittest.TestCase):
     def test_get_remote_hash(self, murlopen):
         res = backend.PyPIResource('name', {'pypi': 'jujuresources>=0.1'}, 'od')
         murlopen.return_value.__iter__.return_value = [
-            '<html>',
-            '<a href="../../packages/source/j/jujuresources/'
-            'jujuresources-0.1.tar.gz#md5=4fdc461dcde13b1e919c17bac6e01464">'
-            'jujuresources-0.1.tar.gz'
-            '</a>',
-            '<a href="../../packages/source/j/jujuresources/'
-            'jujuresources-0.2.tar.gz#md5=deadbeef">'
-            'jujuresources-0.2.tar.gz'
-            '</a>',
-            '</html>']
+            b'<html>',
+            b'<a href="../../packages/source/j/jujuresources/'
+            b'jujuresources-0.1.tar.gz#md5=4fdc461dcde13b1e919c17bac6e01464">'
+            b'jujuresources-0.1.tar.gz'
+            b'</a>',
+            b'<a href="../../packages/source/j/jujuresources/'
+            b'jujuresources-0.2.tar.gz#md5=deadbeef">'
+            b'jujuresources-0.2.tar.gz'
+            b'</a>',
+            b'</html>']
         hash_type, hash = res.get_remote_hash('jujuresources-0.2.tar.gz', 'mirror')
         self.assertEqual(hash, 'deadbeef')
         self.assertEqual(hash_type, 'md5')
@@ -542,11 +542,11 @@ class TestPyPIResource(unittest.TestCase):
     @mock.patch.object(backend, 'urlopen')
     def test_get_index(self, murlopen):
         murlopen.return_value.__iter__.return_value = (
-            '<html>',
-            '<a href="foo">Foo</a>',
-            '<a href="bar">bar</a>',
-            '<a href="baz-0">baz-0</a>',
-            '</html>',
+            b'<html>',
+            b'<a href="foo">Foo</a>',
+            b'<a href="bar">bar</a>',
+            b'<a href="baz-0">baz-0</a>',
+            b'</html>',
         )
         backend.PyPIResource._index = None
         result = backend.PyPIResource._get_index('url')
