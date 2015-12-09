@@ -192,9 +192,8 @@ class URLResource(Resource):
             hash_dst = os.path.join(os.path.dirname(self.destination), hash_filename)
             try:
                 with closing(urlopen(hash_url)) as hash_in, open(hash_dst, 'w+') as hash_out:
-                    hash_out.write(hash_in.read())
-                with open(hash_dst) as fp:
-                    self.hash = fp.read(8*1024).strip()  # hashes should never be that big
+                    self.hash = hash_in.read(8*1024).decode('utf8').strip()  # hashes should never be that big
+                    hash_out.write(self.hash)
             except IOError as e:
                 sys.stderr.write('Error fetching hash {}: {}\n'.format(hash_url, e))
                 return  # ignore download errors; they will be caught by verify
@@ -204,7 +203,7 @@ class URLResource(Resource):
         if os.path.exists(self.destination):
             os.remove(self.destination)  # urlretrieve won't overwrite
         try:
-            with closing(urlopen(url)) as res_in, open(self.destination, 'w+') as res_out:
+            with closing(urlopen(url)) as res_in, open(self.destination, 'wb') as res_out:
                 res_out.write(res_in.read())
         except IOError as e:
             sys.stderr.write('Error fetching {}: {}\n'.format(self.url, e))

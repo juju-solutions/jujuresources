@@ -278,13 +278,13 @@ class TestURLResource(unittest.TestCase):
         assert not mmakedirs.called
         mremove.assert_called_with('od/name/fn')
         murlopen.assert_called_with('http://example.com/path/fn')
-        mopen.assert_called_with('od/name/fn', 'w+')
+        mopen.assert_called_with('od/name/fn', 'wb')
 
         mexists.return_value = False
         res.fetch('http://mirror.com/cache/')
         mmakedirs.assert_called_with('od/name')
         murlopen.assert_called_with('http://mirror.com/cache/name/fn')
-        mopen.assert_called_with('od/name/fn', 'w+')
+        mopen.assert_called_with('od/name/fn', 'wb')
 
     @mock.patch.object(os, 'remove')
     @mock.patch.object(os, 'makedirs')
@@ -297,13 +297,14 @@ class TestURLResource(unittest.TestCase):
             'hash_type': 'hash_type',
         }, 'od')
         mexists.return_value = True
-        mopen = mock.mock_open(read_data='myhash')
+        murlopen.return_value.read.return_value = b'myhash'
+        mopen = mock.mock_open()
         with mock.patch.object(backend, 'open', mopen, create=True):
             res.fetch()
         assert not mmakedirs.called
         mremove.assert_called_with('od/name/fn')
         murlopen.assert_any_call('http://example.com/path/fn')
-        mopen.assert_any_call('od/name/fn', 'w+')
+        mopen.assert_any_call('od/name/fn', 'wb')
         murlopen.assert_any_call('http://example.com/path/fn.hash')
         mopen.assert_any_call('od/name/fn.hash', 'w+')
         self.assertEqual(res.hash, 'myhash')
@@ -317,7 +318,7 @@ class TestURLResource(unittest.TestCase):
         with mock.patch.object(backend, 'open', mopen, create=True):
             res.fetch('http://mirror.com/cache/')
         murlopen.assert_any_call('http://mirror.com/cache/name/fn')
-        mopen.assert_any_call('od/name/fn', 'w+')
+        mopen.assert_any_call('od/name/fn', 'wb')
         murlopen.assert_any_call('http://mirror.com/cache/name/fn.hash')
         mopen.assert_any_call('od/name/fn.hash', 'w+')
 
