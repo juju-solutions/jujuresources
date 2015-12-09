@@ -191,7 +191,7 @@ class URLResource(Resource):
             hash_url = urljoin(mirror_url, os.path.join(self.name, hash_filename)) if mirror_url else self.hash
             hash_dst = os.path.join(os.path.dirname(self.destination), hash_filename)
             try:
-                with closing(urlopen(hash_url)) as hash_in, open(hash_dst, 'w+') as hash_out:
+                with closing(urlopen(hash_url)) as hash_in, open(hash_dst, 'w+b') as hash_out:
                     hash_out.write(hash_in.read())
                 with open(hash_dst) as fp:
                     self.hash = fp.read(8*1024).strip()  # hashes should never be that big
@@ -204,7 +204,7 @@ class URLResource(Resource):
         if os.path.exists(self.destination):
             os.remove(self.destination)  # urlretrieve won't overwrite
         try:
-            with closing(urlopen(url)) as res_in, open(self.destination, 'w+') as res_out:
+            with closing(urlopen(url)) as res_in, open(self.destination, 'w+b') as res_out:
                 res_out.write(res_in.read())
         except IOError as e:
             sys.stderr.write('Error fetching {}: {}\n'.format(self.url, e))
