@@ -97,7 +97,7 @@ class Resource(object):
             return False
         with open(self.destination, 'rb') as fp:
             hash = hashlib.new(self.hash_type)
-            for chunk in iter(lambda: fp.read(16*1024), b''):  # read chunks until nothing returned
+            for chunk in iter(lambda: fp.read(16 * 1024), b''):  # read chunks until nothing returned
                 hash.update(chunk)
             if self.hash != hash.hexdigest():
                 return False
@@ -192,7 +192,7 @@ class URLResource(Resource):
             hash_dst = os.path.join(os.path.dirname(self.destination), hash_filename)
             try:
                 with closing(urlopen(hash_url)) as hash_in, open(hash_dst, 'w+') as hash_out:
-                    self.hash = hash_in.read(8*1024).decode('utf8').strip()  # hashes should never be that big
+                    self.hash = hash_in.read(8 * 1024).decode('utf8').strip()  # hashes should never be that big
                     hash_out.write(self.hash)
             except IOError as e:
                 sys.stderr.write('Error fetching hash {}: {}\n'.format(hash_url, e))
