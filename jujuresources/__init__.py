@@ -202,6 +202,19 @@ def resource_spec(resource_name, resources_yaml='resources.yaml'):
     return resources[resource_name].spec
 
 
+def resource_defined(resource_name, resources_yaml='resources.yaml'):
+    """
+    Check whether a given resource is defined.
+
+    :param str resource_name: The name of a resource to resolve.
+    :param str resources_yaml: Location of the yaml file containing the
+        resource descriptions (default: ``./resources.yaml``).
+        Can be a local file name or a remote URL.
+    """
+    resources = _load(resources_yaml, None)
+    return resource_name in resources
+
+
 def install(which=None, mirror_url=None, destination=None, skip_top_level=False,
             resources_yaml='resources.yaml'):
     """
